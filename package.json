@@ -1,0 +1,22 @@
+{
+  "name": "pilots-hq",
+  "version": "0.1.0",
+  "description": "Prism Intelligent Logistics & Operations Tracking System",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node dist/tests/run-all.js",
+    "dev": "tsc -w",
+    "start": "node dist/api/index.js",
+    "migrate": "node dist/core/db/migrate.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.0",
+    "ioredis": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/pg": "^8.10.0",
+    "@types/node": "^20.0.0"
+  }
+}
