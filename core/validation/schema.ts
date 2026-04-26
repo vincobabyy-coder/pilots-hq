@@ -63,7 +63,7 @@ class NumberValidator {
   }
 }
 
-type AnyValidator = StringValidator | NumberValidator | ObjectValidator
+export type AnyValidator = StringValidator | NumberValidator | ObjectValidator
 
 class ObjectValidator {
   private _required = false
