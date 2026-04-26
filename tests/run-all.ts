@@ -5,5 +5,6 @@ import { run } from './runner'
 // Add each new test file below as it is created.
 import './core/logger.test'
 import './core/validation.test'
+import './core/jwt.test'
 
 run().then(code => process.exit(code)).catch(() => process.exit(1))
