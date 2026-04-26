@@ -37,7 +37,10 @@ export class Router {
     // Check sub-routers first
     for (const { prefix, router } of this.subRouters) {
       const prefixSegments = prefix.split('/').filter(Boolean)
-      if (path.startsWith(prefix)) {
+      // Segment-aware prefix check: every prefix segment must exactly match the incoming path
+      const prefixMatches = prefixSegments.length <= incomingSegments.length &&
+        prefixSegments.every((seg, i) => seg === incomingSegments[i])
+      if (prefixMatches) {
         const remainingPath = '/' + incomingSegments.slice(prefixSegments.length).join('/')
         const result = router.match(method, remainingPath)
         if (result) return result
