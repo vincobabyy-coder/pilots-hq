@@ -25,7 +25,7 @@ query(
    VALUES ('00000000-0000-0000-0000-000000000002',
            '00000000-0000-0000-0000-000000000001',
            'admin@test-org.com', $1, 'Test Admin', 'admin')
-   ON CONFLICT DO NOTHING`,
+   ON CONFLICT (id) DO NOTHING`,
   [hash]
 ).then(() => {
   console.log('Test user seeded: admin@test-org.com / TestPassword123!')
