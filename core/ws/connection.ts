@@ -119,6 +119,7 @@ export class WsConnection extends EventEmitter {
 
         case 0xa: // pong — mark connection as alive
           this.alive = true
+          this.emit('pong')
           break
 
         default:
