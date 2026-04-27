@@ -7,6 +7,8 @@ import { tenantContext } from './middleware/tenant'
 import { errorHandler } from './middleware/error-handler'
 import { authRouter } from './routes/auth'
 import { routesRouter } from './routes/routes'
+import { shipmentsRouter } from './routes/shipments'
+import { driversRouter } from './routes/drivers'
 import { migrate } from '../core/db/migrator'
 import { logger } from '../core/logger/logger'
 
@@ -46,6 +48,8 @@ async function bootstrap(): Promise<void> {
   // Routes
   server.mount('/api/v1/auth', authRouter())
   server.mount('/api/v1/routes', routesRouter())
+  server.mount('/api/v1/shipments', shipmentsRouter())
+  server.mount('/api/v1/drivers', driversRouter())
 
   const port = parseInt(process.env.PORT ?? '3000')
   server.listen(port, () => {
