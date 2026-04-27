@@ -11,6 +11,8 @@ import { shipmentsRouter } from './routes/shipments'
 import { driversRouter } from './routes/drivers'
 import { warehousesRouter } from './routes/warehouses'
 import { ordersRouter } from './routes/orders'
+import { analyticsRouter } from './routes/analytics'
+import { fraudRouter } from './routes/fraud'
 import { startScheduler } from '../core/queue/scheduler'
 import { migrate } from '../core/db/migrator'
 import { logger } from '../core/logger/logger'
@@ -56,6 +58,8 @@ async function bootstrap(): Promise<void> {
   server.mount('/api/v1/drivers', driversRouter())
   server.mount('/api/v1/warehouses', warehousesRouter())
   server.mount('/api/v1/orders', ordersRouter())
+  server.mount('/api/v1/analytics', analyticsRouter())
+  server.mount('/api/v1/fraud', fraudRouter())
 
   // Create the underlying http.Server before binding so WebSocket can attach.
   const httpServer = server.initHttpServer()

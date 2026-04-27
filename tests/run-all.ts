@@ -14,5 +14,9 @@ import './engines/exception-detector.test'
 import './engines/spatial-index.test'
 import './ws/websocket-handshake.test'
 import './engines/hungarian.test'
+import './engines/time-series.test'
+import './engines/percentile.test'
+import './engines/fraud-cusum.test'
+import './engines/fraud-detector.test'
 
 run().then(code => process.exit(code)).catch(() => process.exit(1))
