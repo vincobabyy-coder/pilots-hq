@@ -1,20 +1,50 @@
 version: '3.9'
 services:
-  postgres:
-    image: timescale/timescaledb:latest-pg15
+  api:
+    build: .
+    ports:
+      - "3000:3000"
     environment:
-      POSTGRES_DB: pilots
+      DATABASE_URL: postgresql://pilots:pilots_local@postgres:5432/pilots
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-in-production
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
       POSTGRES_USER: pilots
       POSTGRES_PASSWORD: pilots_local
+      POSTGRES_DB: pilots
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pilots"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     ports:
       - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     ports:
       - "6379:6379"
 
 volumes:
-  pgdata:
+  postgres_data:
+  redis_data:

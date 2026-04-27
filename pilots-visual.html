@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PILOTS — Build Progress</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #18181f;
+    --border: #2a2a3a;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --accent3: #ff6b6b;
+    --accent4: #ffd166;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --done: #00d4aa;
+    --partial: #ffd166;
+    --future: #4a4a6a;
+    --radius: 12px;
+    --font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── LAYOUT ── */
+  .shell { display: flex; min-height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  nav {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 32px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  .nav-logo {
+    padding: 0 24px 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .nav-logo .wordmark {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .nav-logo .sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 24px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+  }
+
+  nav a:hover, nav a.active {
+    color: var(--text);
+    background: var(--surface2);
+    border-left-color: var(--accent);
+  }
+
+  nav a .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-done { background: var(--done); }
+  .dot-partial { background: var(--partial); }
+  .dot-future { background: var(--future); }
+
+  /* ── MAIN ── */
+  main {
+    flex: 1;
+    padding: 48px 56px;
+    max-width: 1100px;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    margin-bottom: 64px;
+  }
+
+  .hero h1 {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 60%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 600px;
+    margin-bottom: 32px;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 28px;
+    min-width: 140px;
+  }
+
+  .stat-num {
+    font-size: 32px;
+    font-weight: 800;
+    font-family: var(--font);
+    color: var(--accent2);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ── SECTION ── */
+  section {
+    margin-bottom: 72px;
+    scroll-margin-top: 32px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .section-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  h2 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+
+  /* ── LAYER STACK ── */
+  .layer-stack { display: flex; flex-direction: column; gap: 8px; }
+
+  .layer {
+    border-radius: 10px;
+    padding: 16px 24px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+
+  .layer:hover { transform: translateX(4px); }
+
+  .layer::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+  }
+
+  .layer-done { background: rgba(0,212,170,0.05); }
+  .layer-done::before { background: var(--done); }
+
+  .layer-partial { background: rgba(255,209,102,0.05); }
+  .layer-partial::before { background: var(--partial); }
+
+  .layer-future { background: rgba(74,74,106,0.15); }
+  .layer-future::before { background: var(--future); }
+
+  .layer-num {
+    font-family: var(--font);
+    font-size: 11px;
+    color: var(--muted);
+    width: 56px;
+    flex-shrink: 0;
+  }
+
+  .layer-content { flex: 1; }
+
+  .layer-title {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 2px;
+  }
+
+  .layer-desc { font-size: 13px; color: var(--muted); }
+
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+
+  .badge-done { background: rgba(0,212,170,0.15); color: var(--done); }
+  .badge-partial { background: rgba(255,209,102,0.15); color: var(--partial); }
+  .badge-future { background: rgba(74,74,106,0.3); color: var(--muted); }
+
+  /* ── WEEK CARDS ── */
+  .week-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+  .week-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+
+  .week-card:hover { border-color: var(--accent); }
+
+  .week-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .week-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    letter-spacing: -0.2px;
+  }
+
+  .week-items { list-style: none; }
+
+  .week-items li {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .week-items li:last-child { border: none; }
+
+  .week-items li::before {
+    content: '▸';
+    color: var(--accent2);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .week-card.future .week-items li::before { color: var(--future); }
+  .week-card.future .week-num { color: var(--muted); }
+
+  /* ── ENGINE GRID ── */
+  .engine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+
+  .engine-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .engine-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .engine-name {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font);
+    color: var(--accent2);
+  }
+
+  .engine-files { list-style: none; }
+
+  .engine-files li {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font);
+    padding: 3px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .engine-files li.done::before { content: '✓'; color: var(--done); font-weight: 700; }
+  .engine-files li.todo::before { content: '○'; color: var(--future); }
+
+  /* ── DATABASE ── */
+  .db-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .db-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .db-table:hover { border-color: var(--accent); }
+
+  .db-table-header {
+    background: rgba(108,99,255,0.1);
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font);
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .db-table-header .tbl-badge {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: rgba(0,212,170,0.15);
+    color: var(--done);
+  }
+
+  .db-table-header .tbl-badge.ts {
+    background: rgba(255,107,107,0.15);
+    color: var(--accent3);
+  }
+
+  .db-table-header .tbl-badge.w4 {
+    background: rgba(255,209,102,0.15);
+    color: var(--partial);
+  }
+
+  .db-cols { padding: 10px 14px; }
+
+  .db-col {
+    font-size: 11px;
+    font-family: var(--font);
+    color: var(--muted);
+    padding: 2px 0;
+  }
+
+  .db-col span { color: rgba(108,99,255,0.7); }
+
+  /* ── API ENDPOINTS ── */
+  .api-group { margin-bottom: 28px; }
+
+  .api-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .endpoint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-family: var(--font);
+    transition: border-color 0.2s;
+  }
+
+  .endpoint:hover { border-color: var(--border); filter: brightness(1.05); }
+
+  .method {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    width: 48px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .method-get { background: rgba(0,212,170,0.15); color: var(--done); }
+  .method-post { background: rgba(108,99,255,0.2); color: var(--accent); }
+  .method-patch { background: rgba(255,209,102,0.15); color: var(--partial); }
+  .method-delete { background: rgba(255,107,107,0.15); color: var(--accent3); }
+
+  .endpoint-path { color: var(--text); flex: 1; }
+  .endpoint-desc { font-size: 11px; color: var(--muted); font-family: sans-serif; }
+
+  /* ── DATAFLOW ── */
+  .flow {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    font-family: var(--font);
+    font-size: 13px;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 12px 0;
+  }
+
+  .flow-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 20px;
+    flex-shrink: 0;
+  }
+
+  .flow-circle {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .flow-line {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    background: linear-gradient(to bottom, var(--border), transparent);
+    margin-top: 4px;
+  }
+
+  .flow-body { padding-top: 1px; }
+  .flow-title { font-weight: 700; color: var(--text); margin-bottom: 3px; }
+  .flow-detail { color: var(--muted); font-size: 12px; }
+
+  /* ── TESTS ── */
+  .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+
+  .test-group {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .test-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .test-case {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .test-case:last-child { border: none; }
+  .test-case::before { content: '✓'; color: var(--done); font-weight: 700; flex-shrink: 0; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-section { margin-bottom: 32px; }
+
+  .progress-item { margin-bottom: 16px; }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── PROPRIETARY PRINCIPLE ── */
+  .principle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+
+  .principle-card {
+    border-radius: var(--radius);
+    padding: 20px;
+    border: 1px solid;
+  }
+
+  .principle-card.built {
+    background: rgba(0,212,170,0.05);
+    border-color: rgba(0,212,170,0.2);
+  }
+
+  .principle-card.external {
+    background: rgba(74,74,106,0.1);
+    border-color: var(--border);
+  }
+
+  .principle-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .built .principle-card-label { color: var(--done); }
+  .external .principle-card-label { color: var(--muted); }
+
+  .principle-items { list-style: none; }
+  .principle-items li {
+    font-size: 12px;
+    padding: 3px 0;
+    font-family: var(--font);
+  }
+
+  .built .principle-items li { color: var(--text); }
+  .external .principle-items li { color: var(--muted); }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 80px;
+    padding: 32px 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .footer-brand {
+    font-weight: 700;
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  /* ── GLOW EFFECT ── */
+  .glow {
+    position: relative;
+  }
+
+  .glow::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    opacity: 0.15;
+    z-index: -1;
+    filter: blur(8px);
+  }
+
+  /* ── CODE INLINE ── */
+  code {
+    background: rgba(108,99,255,0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: rgba(108,99,255,0.06);
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .callout strong { color: var(--text); }
+
+  /* ── TAG ── */
+  .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .tag-purple { background: rgba(108,99,255,0.2); color: var(--accent); }
+  .tag-green { background: rgba(0,212,170,0.15); color: var(--done); }
+  .tag-yellow { background: rgba(255,209,102,0.15); color: var(--partial); }
+  .tag-red { background: rgba(255,107,107,0.15); color: var(--accent3); }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  section { animation: fadeUp 0.4s ease both; }
+  section:nth-child(2) { animation-delay: 0.05s; }
+  section:nth-child(3) { animation-delay: 0.1s; }
+  section:nth-child(4) { animation-delay: 0.15s; }
+  section:nth-child(5) { animation-delay: 0.2s; }
+  section:nth-child(6) { animation-delay: 0.25s; }
+  section:nth-child(7) { animation-delay: 0.3s; }
+
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<nav>
+  <div class="nav-logo">
+    <div class="wordmark">PILOTS</div>
+    <div class="sub">Build Progress · Week 5 Done</div>
+  </div>
+
+  <a href="#overview" class="active"><span class="dot dot-done"></span> Overview</a>
+  <a href="#principle"><span class="dot dot-done"></span> Proprietary Principle</a>
+  <a href="#architecture"><span class="dot dot-done"></span> Architecture</a>
+  <a href="#weeks"><span class="dot dot-done"></span> Week by Week</a>
+  <a href="#engines"><span class="dot dot-done"></span> Algorithm Engines</a>
+  <a href="#database"><span class="dot dot-done"></span> Database Schema</a>
+  <a href="#api"><span class="dot dot-done"></span> API Endpoints</a>
+  <a href="#dataflow"><span class="dot dot-done"></span> Data Flow</a>
+  <a href="#websocket"><span class="dot dot-done"></span> WebSocket</a>
+  <a href="#tests"><span class="dot dot-done"></span> Test Suite</a>
+  <a href="#progress"><span class="dot dot-done"></span> Overall Progress</a>
+  <a href="#next"><span class="dot dot-future"></span> Week 6 Next</a>
+</nav>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<main>
+
+  <!-- HERO -->
+  <div class="hero" id="overview">
+    <h1>What We've Built</h1>
+    <p>
+      PILOTS — Prism Intelligent Logistics & Operations Tracking System.<br/>
+      A multi-tenant global logistics intelligence SaaS, built from absolute zero.
+      No Express. No JWT library. No ORM. No test runner. Every single line proprietary.
+    </p>
+
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">5</div>
+        <div class="stat-label">Weeks Complete</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">128</div>
+        <div class="stat-label">Tests Passing</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">16</div>
+        <div class="stat-label">DB Tables</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">9</div>
+        <div class="stat-label">Algorithm Engines</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">8</div>
+        <div class="stat-label">Architecture Layers</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══ PROPRIETARY PRINCIPLE ══ -->
+  <section id="principle">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(108,99,255,0.1)">🔒</div>
+      <h2>The Proprietary Principle</h2>
+    </div>
+
+    <div class="callout">
+      <strong>The rule:</strong> If it can be written in TypeScript using Node.js built-in modules, we write it.
+      No framework owns us. No library becomes a vulnerability. Every algorithm is ours to optimise.
+    </div>
+
+    <div class="principle-grid">
+      <div class="principle-card built">
+        <div class="principle-card-label">We Built — Proprietary</div>
+        <ul class="principle-items">
+          <li>HTTP server (Node.js http module)</li>
+          <li>Trie-based router (O log n lookup)</li>
+          <li>Middleware pipeline</li>
+          <li>JWT sign / verify (crypto.createHmac)</li>
+          <li>Password hashing (crypto.pbkdf2Sync)</li>
+          <li>SQL query builder</li>
+          <li>Migration runner</li>
+          <li>Rate limiter (token bucket)</li>
+          <li>WebSocket server (RFC 6455)</li>
+          <li>VRP solver (branch-and-bound)</li>
+          <li>Tracking engine (event sourcing)</li>
+          <li>Spatial index (R-tree)</li>
+          <li>Test runner (no Jest)</li>
+          <li>Job queue (priority, retry, DLQ, scheduler)</li>
+          <li>Exception detector</li>
+          <li>Redis cache layer (namespace + SCAN invalidation)</li>
+          <li>In-process typed event bus</li>
+          <li>Hungarian allocation engine (Kuhn-Munkres O(n³))</li>
+          <li>Additive time-series decomposition</li>
+          <li>Demand forecast (trend + seasonal + MAPE)</li>
+          <li>Delivery ETA predictor (speed-profile-aware)</li>
+          <li>Percentile histograms (P50/P95/P99, mergeable)</li>
+          <li>Fraud baseline trainer (Welford online)</li>
+          <li>Fraud detector (Z-score, 5 severity tiers)</li>
+          <li>CUSUM control chart (two-sided S+/S−)</li>
+        </ul>
+      </div>
+
+      <div class="principle-card external">
+        <div class="principle-card-label">External — Protocol / Runtime</div>
+        <ul class="principle-items">
+          <li>Node.js 20 LTS (V8 engine)</li>
+          <li>TypeScript 5 (compiler)</li>
+          <li>PostgreSQL 15 + TimescaleDB</li>
+          <li>Redis 7</li>
+          <li>pg (PostgreSQL wire protocol)</li>
+          <li>ioredis (Redis RESP protocol)</li>
+          <li>React (web UI — future)</li>
+          <li>React Native (mobile — future)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══ ARCHITECTURE LAYERS ══ -->
+  <section id="architecture">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(0,212,170,0.1)">🏗️</div>
+      <h2>8-Layer Architecture</h2>
+    </div>
+
+    <div class="layer-stack">
+
+      <div class="layer layer-future">
+        <div class="layer-num">Layer 8</div>
+        <div class="layer-content">
+          <div class="layer-title">Client Surfaces</div>
+          <div class="layer-desc">Web Dashboard (React) · Driver Mobile App (React Native) · Truck Client (Node.js) · Customer Portal</div>
+        </div>
+        <span class="badge badge-future">Future</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 7</div>
+        <div class="layer-content">
+          <div class="layer-title">Real-Time Communication — Custom WebSocket Server</div>
+          <div class="layer-desc">RFC 6455 handshake from scratch · Frame parsing (masked/unmasked) · Room-based pub/sub · Redis pub/sub for multi-node scale · Heartbeat (ping/pong) · Graceful teardown</div>
+        </div>
+        <span class="badge badge-done">Done ✓</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 6</div>
+        <div class="layer-content">
+          <div class="layer-title">Job Orchestration</div>
+          <div class="layer-desc">Priority queue (high/normal/low lanes) · Exponential backoff retry (1s/2s/4s) · DLQ capped at 1000 · Concurrency pool · Distributed scheduler via Redis sorted set + SETNX lock · In-process typed event bus (5 domain events) · Redis cache layer (SCAN-based invalidation, TTL 1–86400s)</div>
+        </div>
+        <span class="badge badge-done">Done ✓</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 5</div>
+        <div class="layer-content">
+          <div class="layer-title">Algorithm Engines — All Proprietary</div>
+          <div class="layer-desc">Route Optimizer ✓ · Tracking Engine ✓ · Allocation / Hungarian ✓ · Analytics ×4 ✓ · Fraud Detection ×3 ✓ — 9 engines total, all complete</div>
+        </div>
+        <span class="badge badge-done">5 of 5 ✓</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 4</div>
+        <div class="layer-content">
+          <div class="layer-title">Custom HTTP Server + REST API</div>
+          <div class="layer-desc">PilotsServer · Trie Router · Middleware Pipeline · Security headers, CORS, body parser, request logger · Auth, rate-limiter, multi-tenant context · Route + Shipment + Driver + Auth endpoints</div>
+        </div>
+        <span class="badge badge-done">Done ✓</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 3</div>
+        <div class="layer-content">
+          <div class="layer-title">Proprietary Data Access</div>
+          <div class="layer-desc">PG connection pool wrapper · Hand-written query builder · Migration runner (SQL files, ordered, idempotent) · Read-replica routing · Redis Sentinel HA support</div>
+        </div>
+        <span class="badge badge-done">Done ✓</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 2</div>
+        <div class="layer-content">
+          <div class="layer-title">Infrastructure</div>
+          <div class="layer-desc">PostgreSQL 15 + TimescaleDB (hypertables for time-series tracking events) · Redis 7 (rate limiting, job queue, WebSocket pub/sub, cache)</div>
+        </div>
+        <span class="badge badge-done">Done ✓</span>
+      </div>
+
+      <div class="layer layer-done">
+        <div class="layer-num">Layer 1</div>
+        <div class="layer-content">
+          <div class="layer-title">Runtime</div>
+          <div class="layer-desc">Node.js 20 LTS · TypeScript 5 (strict mode, noImplicitAny, noImplicitReturns) · All compiled with tsc, run with node</div>
+        </div>
+        <span class="badge badge-done">Done ✓</span>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ WEEKS ══ -->
+  <section id="weeks">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(255,209,102,0.1)">📅</div>
+      <h2>Week by Week</h2>
+    </div>
+
+    <div class="week-grid">
+
+      <div class="week-card">
+        <div class="week-num">Week 1 — Complete ✓</div>
+        <div class="week-title">Core Infrastructure</div>
+        <ul class="week-items">
+          <li>Custom HTTP server (Node.js http module, no Express)</li>
+          <li>Trie-based router — O(log n) route lookup</li>
+          <li>Middleware pipeline — security, CORS, logger, body parser</li>
+          <li>JWT sign/verify using crypto.createHmac (HS256)</li>
+          <li>Password hashing via crypto.pbkdf2Sync (64-byte salt, 10k iterations)</li>
+          <li>PostgreSQL pool wrapper + hand-written query builder</li>
+          <li>SQL migration runner (idempotent, ordered, tracks applied)</li>
+          <li>Token bucket rate limiter (Redis-backed, per-IP + per-org)</li>
+          <li>Multi-tenant context injector (org_id from JWT into every request)</li>
+          <li>Auth routes: POST /login, POST /refresh, GET /me</li>
+          <li>Runtime schema validator (no Zod)</li>
+          <li>Structured JSON logger (no pino/winston)</li>
+          <li>Proprietary test runner (no Jest/Mocha)</li>
+          <li>14 DB tables fully migrated</li>
+          <li>Seeded test data for development</li>
+        </ul>
+      </div>
+
+      <div class="week-card">
+        <div class="week-num">Week 2 — Complete ✓</div>
+        <div class="week-title">Route Optimizer + Job Queue</div>
+        <ul class="week-items">
+          <li>Haversine distance matrix — great-circle distance in km</li>
+          <li>Speed profile learning — weighted running-average per (hour, weekday)</li>
+          <li>Greedy nearest-neighbor initializer — O(stops × vehicles), capacity-aware</li>
+          <li>Branch-and-bound VRP solver — nearest-insertion lower bound pruning, 30s wall limit</li>
+          <li>VRP orchestrator — greedy → B&B → returns the better result</li>
+          <li>Simple Redis job queue — RPUSH enqueue, BLPOP worker, typed handler, start/stop</li>
+          <li>Route API — POST /optimize (async), GET /jobs/:id (poll), GET /:id, POST /:id/confirm, PATCH /:id/reassign</li>
+          <li>12 engine tests — Haversine accuracy, speed fallback, greedy capacity, B&B correctness</li>
+          <li>50-stop performance benchmark — passes in &lt;5s</li>
+        </ul>
+      </div>
+
+      <div class="week-card">
+        <div class="week-num">Week 3 — Complete ✓</div>
+        <div class="week-title">Tracking Engine + WebSocket</div>
+        <ul class="week-items">
+          <li>Immutable append-only event log — all state derived from events (never stored)</li>
+          <li>Event state machine — 9 event types → valid transitions enforced</li>
+          <li>CQRS: write side (commands) + read side (queries, replays event sequence)</li>
+          <li>Exception detector — overdue (&gt;2h late), stale (&gt;45min no update), location anomaly (&gt;50km jump in &lt;10min)</li>
+          <li>Proprietary R-tree spatial index — "find all shipments within X km" without PostGIS</li>
+          <li>RFC 6455 WebSocket server from Node.js net — full handshake, frame parsing, masking, close frames</li>
+          <li>Room-based pub/sub — clients subscribe by shipment ID</li>
+          <li>Redis pub/sub bridge — events fan out to all server nodes</li>
+          <li>Heartbeat system — server pings every 30s, drops dead connections</li>
+          <li>Shipment CRUD API — create, list, get, update status</li>
+          <li>Tracking event endpoints — append event, get history, get current state</li>
+          <li>Driver location update API — broadcasts to all WebSocket subscribers</li>
+        </ul>
+      </div>
+
+      <div class="week-card">
+        <div class="week-num">Week 4 — Complete ✓</div>
+        <div class="week-title">Infrastructure Completion + Allocation</div>
+        <ul class="week-items">
+          <li>Redis cache layer — namespace + key pattern <code>pilots:cache:{ns}:{key}</code>, SCAN-based invalidation, TTL 1–86400s, <code>pingRedis()</code> health</li>
+          <li>Typed in-process event bus — <code>TypedEventBus&lt;PilotsEvents&gt;</code>, 5 domain events: route.completed, shipment.delivered, exception.raised, order.allocated, speed.profile.update</li>
+          <li>Full job queue — priority lanes (high/normal/low), exponential backoff retry (1s/2s/4s), DLQ capped at 1000</li>
+          <li>Worker pool — concurrency control, graceful drain</li>
+          <li>Distributed cron scheduler — Redis sorted set + SETNX lock, tick every 5s</li>
+          <li>Hungarian algorithm (Kuhn-Munkres O(n³)) — optimal order→warehouse assignment via <code>Map&lt;orderId, warehouseId&gt;</code></li>
+          <li>Bipartite cost matrix — Haversine + inventory deficit penalty (+1000/missing SKU) + capacity penalty (utilisation × 200 if &gt;80%)</li>
+          <li>Migration 015 — warehouse_inventory table with reserved_quantity + CHECK constraints</li>
+          <li>Warehouses API — GET list/detail/inventory, PATCH inventory upsert</li>
+          <li>Orders API — POST/GET/GET :id, POST :id/allocate + order.service.ts</li>
+          <li>Speed-profile learning wired — shipment.delivered event → haversine per leg → updateSpeedProfile</li>
+        </ul>
+      </div>
+
+      <div class="week-card">
+        <div class="week-num">Week 5 — Complete ✓</div>
+        <div class="week-title">Analytics Engine + Fraud Detection</div>
+        <ul class="week-items">
+          <li>Time-series decomposition — centred moving average, seasonal index, linear regression + R²</li>
+          <li>Demand forecast — trend extrapolation + seasonal repeat, ±1σ confidence bands, MAPE</li>
+          <li>Delivery predictor — async, speed-profile-aware per-leg ETA prediction</li>
+          <li>Percentile engine — equal-width histogram, P50/P95/P99, mergeable histograms</li>
+          <li>Fraud baseline trainer — Welford's online algorithm (mean/M2/stddev incremental), <code>trainBaseline</code> bulk loader</li>
+          <li>Fraud detector — Z-score anomaly, 5 severity tiers (low/medium/high/critical, thresholds 2/3/4/5σ)</li>
+          <li>CUSUM control chart — two-sided (S+/S−), configurable k/h, <code>processBatch</code></li>
+          <li>Migration 016 — fraud_baselines table with M2 column</li>
+          <li>Analytics API — 5 routes: forecast, predict-delivery, percentiles, decompose, delivery-stats</li>
+          <li>Fraud API — 5 routes: detect, detect-batch, baseline/train, baseline/:metric, cusum</li>
+          <li>Health endpoint — GET /api/v1/health (unauthenticated, checks DB + Redis, returns status/uptime/version)</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ ENGINES ══ -->
+  <section id="engines">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(255,107,107,0.1)">⚙️</div>
+      <h2>Algorithm Engines</h2>
+    </div>
+
+    <div class="engine-grid">
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">route-optimizer/</span>
+          <span class="badge badge-done">Complete</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">types.ts — Stop, Vehicle, SolverInput, SolverResult</li>
+          <li class="done">distance-matrix.ts — Haversine + speed profiles</li>
+          <li class="done">greedy-init.ts — nearest-neighbor heuristic</li>
+          <li class="done">branch-and-bound.ts — B&B with pruning</li>
+          <li class="done">vrp.ts — orchestrator + async job dispatch</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">tracking/</span>
+          <span class="badge badge-done">Complete</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">types.ts — TrackingEvent, ShipmentState</li>
+          <li class="done">event-log.ts — immutable append-only</li>
+          <li class="done">state-machine.ts — event → state transitions</li>
+          <li class="done">commands.ts — CQRS write side</li>
+          <li class="done">queries.ts — CQRS read (replay)</li>
+          <li class="done">exception-detector.ts — 3 anomaly checks</li>
+          <li class="done">spatial-index.ts — R-tree radius queries</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">allocation/</span>
+          <span class="badge badge-done">Complete</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">bipartite-graph.ts — cost matrix (haversine + deficit + capacity penalties)</li>
+          <li class="done">hungarian.ts — Kuhn-Munkres O(n³), returns Map&lt;orderId, warehouseId&gt;</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">core/cache + core/queue/</span>
+          <span class="badge badge-done">Complete</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">cache.ts — namespace prefixed, SCAN invalidation, TTL 1–86400s</li>
+          <li class="done">event-bus.ts — TypedEventBus, 5 domain events</li>
+          <li class="done">queue.ts — priority lanes, exponential backoff, DLQ ≤1000</li>
+          <li class="done">worker.ts — concurrency pool, graceful drain</li>
+          <li class="done">scheduler.ts — Redis sorted set + SETNX lock</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">analytics/</span>
+          <span class="badge badge-done">Complete</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">time-series.ts — centred MA, seasonal index, linear regression + R²</li>
+          <li class="done">demand-forecast.ts — trend + seasonal, ±1σ bands, MAPE</li>
+          <li class="done">delivery-predictor.ts — async speed-profile-aware per-leg ETA</li>
+          <li class="done">percentile.ts — equal-width histogram, P50/P95/P99, mergeable</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">fraud/</span>
+          <span class="badge badge-done">Complete</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">baseline.ts — Welford's online algorithm, trainBaseline bulk loader</li>
+          <li class="done">detector.ts — Z-score anomaly, 5 severity tiers (2/3/4/5σ)</li>
+          <li class="done">cusum.ts — two-sided S+/S−, configurable k/h, processBatch</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ DATABASE ══ -->
+  <section id="database">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(0,212,170,0.08)">🗄️</div>
+      <h2>Database Schema — 16 Tables</h2>
+    </div>
+
+    <div class="callout">
+      All tables: UUID primary keys · <code>created_at</code> immutable · <code>updated_at</code> mutable ·
+      org-scoped indexes · FK constraints at DB level · Multi-tenant by design (every table scoped to <code>org_id</code>)
+    </div>
+
+    <div class="db-grid">
+
+      <div class="db-table">
+        <div class="db-table-header">organizations <span class="tbl-badge">Root</span></div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">name, slug</div>
+          <div class="db-col">api_key (unique)</div>
+          <div class="db-col">features <span>JSONB</span></div>
+          <div class="db-col">settings <span>JSONB</span></div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">users</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">email, name</div>
+          <div class="db-col">password_hash</div>
+          <div class="db-col">role (admin/dispatcher…)</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">warehouses</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">lat, lon <span>DECIMAL</span></div>
+          <div class="db-col">capacity_units, current_units</div>
+          <div class="db-col">operating_hours <span>JSONB</span></div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">customers</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">name, email, phone</div>
+          <div class="db-col">address <span>JSONB</span></div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">vehicles</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">type (van/truck/container)</div>
+          <div class="db-col">capacity_kg, capacity_cbm</div>
+          <div class="db-col">status (available/…)</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">drivers</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">vehicle_id <span>FK</span></div>
+          <div class="db-col">current_lat, current_lon</div>
+          <div class="db-col">performance_rating, total_deliveries</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">orders</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">customer_id <span>FK</span></div>
+          <div class="db-col">items <span>JSONB</span></div>
+          <div class="db-col">allocated_warehouse_id <span>FK</span></div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">routes</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">stops <span>JSONB</span></div>
+          <div class="db-col">total_distance_km</div>
+          <div class="db-col">started_at, completed_at</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">speed_profiles</div>
+        <div class="db-cols">
+          <div class="db-col">org_id, hour, weekday</div>
+          <div class="db-col">avg_speed_kmh</div>
+          <div class="db-col">sample_count</div>
+          <div class="db-col">updated_at</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">shipments</div>
+        <div class="db-cols">
+          <div class="db-col">id <span>UUID PK</span></div>
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">status (created/in_transit…)</div>
+          <div class="db-col">assigned_driver_id <span>FK</span></div>
+          <div class="db-col">exception_flag, exception_reason</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">shipment_orders</div>
+        <div class="db-cols">
+          <div class="db-col">shipment_id <span>FK</span></div>
+          <div class="db-col">order_id <span>FK</span></div>
+          <div class="db-col">Composite PK</div>
+          <div class="db-col">Junction table</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">tracking_events <span class="tbl-badge ts">TimescaleDB</span></div>
+        <div class="db-cols">
+          <div class="db-col">id + created_at <span>Composite PK</span></div>
+          <div class="db-col">shipment_id <span>FK</span></div>
+          <div class="db-col">event_type, event_status</div>
+          <div class="db-col">lat, lon <span>DECIMAL</span></div>
+          <div class="db-col">details <span>JSONB</span></div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">_migrations <span class="tbl-badge">Internal</span></div>
+        <div class="db-cols">
+          <div class="db-col">filename</div>
+          <div class="db-col">applied_at</div>
+          <div class="db-col">Tracks which SQL files have run — ensures idempotency</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">warehouse_inventory <span class="tbl-badge">M015</span></div>
+        <div class="db-cols">
+          <div class="db-col">warehouse_id <span>FK</span></div>
+          <div class="db-col">sku <span>VARCHAR</span></div>
+          <div class="db-col">quantity <span>CHECK ≥ 0</span></div>
+          <div class="db-col">reserved_quantity <span>CHECK ≥ 0</span></div>
+          <div class="db-col">Composite PK (warehouse_id, sku)</div>
+        </div>
+      </div>
+
+      <div class="db-table">
+        <div class="db-table-header">fraud_baselines <span class="tbl-badge">M016</span></div>
+        <div class="db-cols">
+          <div class="db-col">org_id <span>FK</span></div>
+          <div class="db-col">metric <span>VARCHAR</span></div>
+          <div class="db-col">mean, m2 <span>FLOAT</span></div>
+          <div class="db-col">stddev <span>FLOAT</span></div>
+          <div class="db-col">count <span>INT</span></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ API ══ -->
+  <section id="api">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(108,99,255,0.1)">🌐</div>
+      <h2>REST API — All Endpoints</h2>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Auth — /api/v1/auth</div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/auth/login</span><span class="endpoint-desc">Returns access_token + refresh_token (JWT)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/auth/refresh</span><span class="endpoint-desc">Rotates tokens using refresh_token</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/auth/me</span><span class="endpoint-desc">Returns current user profile</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Route Optimizer — /api/v1/routes</div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/routes/optimize</span><span class="endpoint-desc">Enqueues async VRP solve job → returns { jobId }</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/routes/jobs/:jobId</span><span class="endpoint-desc">Poll job status (pending → running → done)</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/routes/:id</span><span class="endpoint-desc">Get route with all stops</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/routes/:id/confirm</span><span class="endpoint-desc">Confirm route → updates status to confirmed</span></div>
+      <div class="endpoint"><span class="method method-patch">PATCH</span><span class="endpoint-path">/routes/:id/reassign</span><span class="endpoint-desc">Reassign driver or vehicle</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Shipments — /api/v1/shipments</div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/shipments</span><span class="endpoint-desc">Create shipment with order IDs attached</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/shipments</span><span class="endpoint-desc">List shipments (paginated, filterable by status)</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/shipments/:id</span><span class="endpoint-desc">Get shipment + current state</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/shipments/:id/events</span><span class="endpoint-desc">Append tracking event → state machine transition + WS broadcast</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/shipments/:id/events</span><span class="endpoint-desc">Get full event history (replays from log)</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/shipments/:id/state</span><span class="endpoint-desc">Get reconstructed current state (CQRS read)</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Drivers — /api/v1/drivers</div>
+      <div class="endpoint"><span class="method method-patch">PATCH</span><span class="endpoint-path">/drivers/:id/location</span><span class="endpoint-desc">Update GPS coords → exception check → WS broadcast to shipment rooms</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/drivers</span><span class="endpoint-desc">List drivers with current status</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/drivers/:id</span><span class="endpoint-desc">Get driver + current location</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Warehouses — /api/v1/warehouses</div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/warehouses</span><span class="endpoint-desc">List warehouses with utilisation %</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/warehouses/:id</span><span class="endpoint-desc">Get warehouse detail</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/warehouses/:id/inventory</span><span class="endpoint-desc">Get full SKU inventory for warehouse</span></div>
+      <div class="endpoint"><span class="method method-patch">PATCH</span><span class="endpoint-path">/warehouses/:id/inventory/:sku</span><span class="endpoint-desc">Upsert SKU quantity (reserved_quantity enforced)</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Orders — /api/v1/orders</div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/orders</span><span class="endpoint-desc">Create order → auto-run Hungarian allocation → emit order.allocated event</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/orders</span><span class="endpoint-desc">List orders (paginated, filterable by status)</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/orders/:id</span><span class="endpoint-desc">Get order + allocated warehouse</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/orders/:id/allocate</span><span class="endpoint-desc">Re-run Hungarian allocation for existing order</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Analytics — /api/v1/analytics</div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/analytics/forecast</span><span class="endpoint-desc">Demand forecast — trend extrapolation + seasonal, ±1σ bands, MAPE</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/analytics/forecast</span><span class="endpoint-desc">Get stored forecast results for org</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/analytics/predict-delivery</span><span class="endpoint-desc">Speed-profile-aware per-leg ETA prediction</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/analytics/percentiles</span><span class="endpoint-desc">Compute P50/P95/P99 from histogram data</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/analytics/decompose</span><span class="endpoint-desc">Additive time-series decomposition (trend + seasonal + residual)</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/analytics/delivery-stats</span><span class="endpoint-desc">Aggregated delivery performance statistics</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Fraud — /api/v1/fraud</div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/fraud/detect</span><span class="endpoint-desc">Z-score anomaly check — returns severity tier (low/medium/high/critical)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/fraud/detect-batch</span><span class="endpoint-desc">Batch anomaly detection across multiple metrics</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/fraud/baseline/train</span><span class="endpoint-desc">Bulk train Welford baseline from historical data</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/fraud/baseline/:metric</span><span class="endpoint-desc">Get current baseline stats (mean, stddev, count) for metric</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/fraud/cusum</span><span class="endpoint-desc">Run two-sided CUSUM control chart — returns S+/S− and alarm flags</span></div>
+    </div>
+
+    <div class="api-group">
+      <div class="api-group-title">Health — /api/v1/health</div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/health</span><span class="endpoint-desc">Unauthenticated — checks DB + Redis, returns status / uptime / version</span></div>
+    </div>
+  </section>
+
+
+  <!-- ══ DATA FLOW ══ -->
+  <section id="dataflow">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(255,209,102,0.08)">🔄</div>
+      <h2>System Data Flows</h2>
+    </div>
+
+    <div class="flow">
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(108,99,255,0.3);color:var(--accent)">1</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">HTTP Request arrives</div>
+          <div class="flow-detail">POST /api/v1/shipments/:id/events — body: { event_type: "location_updated", lat: 6.52, lon: 3.38 }</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(0,212,170,0.15);color:var(--done)">2</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Middleware Pipeline</div>
+          <div class="flow-detail">securityHeaders → cors → requestLogger → authenticate (JWT verify) → tenantContext (org_id) → rateLimiter (token bucket)</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(108,99,255,0.3);color:var(--accent)">3</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Route Handler dispatches to Tracking Engine</div>
+          <div class="flow-detail">Validates body against schema validator · Calls appendEvent(shipmentId, orgId, event)</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,107,107,0.2);color:var(--accent3)">4</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Event Log appends to PostgreSQL (TimescaleDB hypertable)</div>
+          <div class="flow-detail">INSERT into tracking_events (immutable) · State reconstructed by replaying all events for shipment</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,209,102,0.2);color:var(--partial)">5</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">State Machine validates transition</div>
+          <div class="flow-detail">e.g. in_transit → location_updated is valid · cancelled → location_updated throws (invalid transition)</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,107,107,0.2);color:var(--accent3)">6</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Exception Detector runs automatically</div>
+          <div class="flow-detail">Check 1: Is delivery &gt;2h past estimated? · Check 2: Last update &gt;45min ago? · Check 3: Location jumped &gt;50km in &lt;10min? (anomaly)</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(0,212,170,0.15);color:var(--done)">7</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Spatial Index updated (R-tree)</div>
+          <div class="flow-detail">Driver's new position entered into R-tree bounding box structure · Enables O(log n) "find all shipments near lat/lon" queries</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(108,99,255,0.3);color:var(--accent)">8</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">WebSocket broadcasts to room "shipment:abc-123"</div>
+          <div class="flow-detail">wsServer.broadcast(room, payload) → RoomManager finds all connections → each WsConnection.send() → RFC 6455 text frame written to TCP socket</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(0,212,170,0.15);color:var(--done)">9</div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Redis pub/sub fan-out (multi-node scale)</div>
+          <div class="flow-detail">If multiple server instances are running, the event is published to Redis · All other nodes receive it and broadcast to their own connected clients</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:32px;margin-bottom:8px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Flow B — Order Allocation</div>
+    <div class="flow">
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(108,99,255,0.3);color:var(--accent)">1</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">POST /api/v1/orders</div>
+          <div class="flow-detail">Body: { customer_id, items: [{ sku, quantity }] } — passes auth + tenant middleware</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,209,102,0.2);color:var(--partial)">2</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">order.service.ts queries warehouse inventory</div>
+          <div class="flow-detail">Fetches all warehouses + inventory for org · Builds bipartite cost matrix: haversine distance + inventory deficit penalty (+1000/missing SKU) + capacity penalty (utilisation × 200 if &gt;80%)</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,107,107,0.2);color:var(--accent3)">3</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Hungarian algorithm solves assignment (O(n³))</div>
+          <div class="flow-detail">Kuhn-Munkres finds globally optimal order→warehouse mapping · Returns Map&lt;orderId, warehouseId&gt; — never greedy, always optimal</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(0,212,170,0.15);color:var(--done)">4</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Order written to DB + inventory reserved</div>
+          <div class="flow-detail">INSERT order with allocated_warehouse_id · PATCH warehouse_inventory reserved_quantity · All in a single transaction</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(108,99,255,0.3);color:var(--accent)">5</div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">EventBus emits order.allocated</div>
+          <div class="flow-detail">TypedEventBus broadcasts internally · Any subscriber (e.g. route optimizer, WebSocket broadcaster) reacts without coupling to the HTTP handler</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:32px;margin-bottom:8px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Flow C — Analytics + Fraud Alert</div>
+    <div class="flow">
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(0,212,170,0.15);color:var(--done)">1</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">shipment.delivered event fires on EventBus</div>
+          <div class="flow-detail">Emitted when tracking state machine transitions to delivered · Carries orgId, route legs (lat/lon pairs), timestamps</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,209,102,0.2);color:var(--partial)">2</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Speed-profile learning updates</div>
+          <div class="flow-detail">Haversine per leg ÷ elapsed time → speedKmh · updateSpeedProfile(orgId, hour, dayOfWeek, speedKmh) updates weighted running average</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(108,99,255,0.3);color:var(--accent)">3</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Delivery predictor produces per-leg ETA</div>
+          <div class="flow-detail">delivery-predictor.ts fetches speed profile for (hour, dayOfWeek) · Haversine distance ÷ speed → ETA per leg · Async, non-blocking</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,107,107,0.2);color:var(--accent3)">4</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Fraud detector checks metric against baseline</div>
+          <div class="flow-detail">Z-score = (value − mean) ÷ stddev · Severity: low ≥2σ, medium ≥3σ, high ≥4σ, critical ≥5σ · CUSUM runs in parallel: S+ = max(0, S+ + x − k), alarms when S &gt; h</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(255,107,107,0.2);color:var(--accent3)">5</div>
+          <div class="flow-line"></div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Time-series decomposition + demand forecast</div>
+          <div class="flow-detail">Centred MA removes seasonality → linear regression on trend component → seasonal index × trend extrapolation → ±1σ confidence bands · MAPE reported</div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-connector">
+          <div class="flow-circle" style="background:rgba(0,212,170,0.15);color:var(--done)">6</div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-title">Insights surfaced via Analytics + Fraud APIs</div>
+          <div class="flow-detail">GET /analytics/forecast · POST /fraud/detect · GET /analytics/delivery-stats · POST /analytics/percentiles — all behind JWT auth, scoped to org_id</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ WEBSOCKET DEEP DIVE ══ -->
+  <section id="websocket">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(0,212,170,0.08)">📡</div>
+      <h2>WebSocket — Built from Raw TCP</h2>
+    </div>
+
+    <div class="callout">
+      <strong>Zero library.</strong> The WebSocket server handles the RFC 6455 protocol from scratch:
+      HTTP → TCP upgrade, handshake, frame parsing (masking, XOR decode, 64-bit payload length), ping/pong heartbeat,
+      graceful close frames, Redis pub/sub for multi-node scale. No <code>ws</code> npm package.
+    </div>
+
+    <div class="engine-grid">
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">core/ws/server.ts</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">Listens for HTTP "upgrade" events</li>
+          <li class="done">Validates Sec-WebSocket-Key header</li>
+          <li class="done">Sends 101 Switching Protocols response</li>
+          <li class="done">Creates WsConnection per upgrade</li>
+          <li class="done">Starts 30s ping heartbeat per connection</li>
+          <li class="done">Drops unresponsive connections</li>
+          <li class="done">Subscribes to Redis for multi-node events</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">core/ws/connection.ts</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">Accumulates TCP data into buffer</li>
+          <li class="done">Parses RFC 6455 frames (while loop)</li>
+          <li class="done">Handles 126 / 127 extended payload length</li>
+          <li class="done">XOR-unmasks client-to-server frames</li>
+          <li class="done">Dispatches text / binary / ping / pong / close opcodes</li>
+          <li class="done">Builds server frames (FIN=1, never masked)</li>
+          <li class="done">Emits pong event (heartbeat tracks liveness)</li>
+        </ul>
+      </div>
+
+      <div class="engine-card">
+        <div class="engine-header">
+          <span class="engine-name">core/ws/rooms.ts</span>
+        </div>
+        <ul class="engine-files">
+          <li class="done">Map(roomId → Set of WsConnections)</li>
+          <li class="done">join(conn, room) / leave(conn, room)</li>
+          <li class="done">broadcast(room, message) to all in room</li>
+          <li class="done">Cleans up on connection close</li>
+          <li class="done">Room names: "shipment:uuid", "org:uuid"</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══ TESTS ══ -->
+  <section id="tests">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(0,212,170,0.08)">✅</div>
+      <h2>Test Suite — 128 Tests, 0 Failures</h2>
+    </div>
+
+    <div class="callout">
+      <strong>Proprietary test runner.</strong> No Jest, no Mocha, no Vitest. We wrote our own
+      <code>describe/it/expect</code> with async support, TAP-style output, and a <code>run()</code> function
+      that exits with code 1 on failure. TDD throughout.
+    </div>
+
+    <div class="test-grid">
+
+      <div class="test-group">
+        <div class="test-group-title">Core — Week 1</div>
+        <div class="test-case">Logger exports info/warn/error/debug</div>
+        <div class="test-case">Logger doesn't throw on message-only call</div>
+        <div class="test-case">JWT sign + verify round-trip</div>
+        <div class="test-case">JWT rejects tampered token</div>
+        <div class="test-case">JWT rejects expired token</div>
+        <div class="test-case">Password hash + verify</div>
+        <div class="test-case">Password verify rejects wrong password</div>
+        <div class="test-case">Schema validator — string, number, boolean</div>
+        <div class="test-case">Schema validator — nested objects</div>
+        <div class="test-case">Schema validator — required fields</div>
+        <div class="test-case">Trie router — exact match</div>
+        <div class="test-case">Trie router — param extraction (:id)</div>
+        <div class="test-case">Trie router — 404 on unknown path</div>
+        <div class="test-case">DB pool — connection health check</div>
+        <div class="test-case">Auth integration — login → refresh → /me</div>
+      </div>
+
+      <div class="test-group">
+        <div class="test-group-title">Engines — Week 2</div>
+        <div class="test-case">Haversine accuracy (known city pairs)</div>
+        <div class="test-case">Speed profile fallback to default</div>
+        <div class="test-case">Distance matrix div-by-zero guard</div>
+        <div class="test-case">Distance matrix input range validation</div>
+        <div class="test-case">Greedy init — respects vehicle capacity</div>
+        <div class="test-case">Greedy init — stop ordering</div>
+        <div class="test-case">B&B solver — finds feasible solution</div>
+        <div class="test-case">B&B solver — result better than greedy</div>
+        <div class="test-case">VRP orchestrator — end-to-end</div>
+        <div class="test-case">50-stop benchmark — completes in &lt;5s</div>
+        <div class="test-case">Routes integration — optimize → poll → confirm</div>
+        <div class="test-case">Array element type validation</div>
+      </div>
+
+      <div class="test-group">
+        <div class="test-group-title">Engines — Week 3</div>
+        <div class="test-case">State machine — valid transitions</div>
+        <div class="test-case">State machine — invalid transition throws</div>
+        <div class="test-case">State machine — full delivery sequence</div>
+        <div class="test-case">Exception detector — overdue shipment</div>
+        <div class="test-case">Exception detector — stale location</div>
+        <div class="test-case">Exception detector — location anomaly jump</div>
+        <div class="test-case">Spatial index — insert + radius query</div>
+        <div class="test-case">Spatial index — multiple results in range</div>
+        <div class="test-case">Spatial index — no results outside range</div>
+      </div>
+
+      <div class="test-group">
+        <div class="test-group-title">WebSocket — Week 3</div>
+        <div class="test-case">RFC 6455 handshake (Sec-WebSocket-Accept)</div>
+        <div class="test-case">101 Switching Protocols response</div>
+        <div class="test-case">Client can send masked text frame</div>
+        <div class="test-case">Server echoes text back unmasked</div>
+        <div class="test-case">Ping → pong response</div>
+        <div class="test-case">pong event emitted on WsConnection</div>
+        <div class="test-case">Room join on URL query param</div>
+        <div class="test-case">Room broadcast reaches all members</div>
+        <div class="test-case">Close frame triggers socket teardown</div>
+      </div>
+
+      <div class="test-group">
+        <div class="test-group-title">Allocation — Week 4 <span class="tag tag-green" style="margin-left:6px">10 tests</span></div>
+        <div class="test-case">Hungarian — 1×1 trivial assignment</div>
+        <div class="test-case">Hungarian — 2×2 optimal (not greedy)</div>
+        <div class="test-case">Hungarian — 3×3 full matrix</div>
+        <div class="test-case">Hungarian — asymmetric cost matrix (more warehouses than orders)</div>
+        <div class="test-case">Hungarian — all costs equal → any valid assignment</div>
+        <div class="test-case">Bipartite graph — haversine cost correct</div>
+        <div class="test-case">Bipartite graph — inventory deficit penalty applied (+1000/SKU)</div>
+        <div class="test-case">Bipartite graph — capacity penalty at &gt;80% utilisation</div>
+        <div class="test-case">Bipartite graph — returns Map&lt;orderId, warehouseId&gt;</div>
+        <div class="test-case">Allocation end-to-end — optimal warehouse selected</div>
+      </div>
+
+      <div class="test-group">
+        <div class="test-group-title">Analytics — Week 5 <span class="tag tag-green" style="margin-left:6px">19 tests</span></div>
+        <div class="test-case">Demand forecast — trend extrapolation correct</div>
+        <div class="test-case">Demand forecast — seasonal repeat applies index</div>
+        <div class="test-case">Demand forecast — ±1σ confidence bands computed</div>
+        <div class="test-case">Demand forecast — MAPE within expected range</div>
+        <div class="test-case">Demand forecast — handles flat (no-trend) series</div>
+        <div class="test-case">Demand forecast — short series (n=4) graceful</div>
+        <div class="test-case">Time-series — centred MA removes seasonality</div>
+        <div class="test-case">Time-series — seasonal index averages to 1</div>
+        <div class="test-case">Time-series — linear regression R² returned</div>
+        <div class="test-case">Time-series — residuals sum near zero</div>
+        <div class="test-case">Percentile — P50 matches median</div>
+        <div class="test-case">Percentile — P95 and P99 correct on known distribution</div>
+        <div class="test-case">Percentile — merge two histograms correctly</div>
+        <div class="test-case">Percentile — empty histogram returns null safely</div>
+        <div class="test-case">Delivery predictor — ETA per leg matches distance ÷ speed</div>
+        <div class="test-case">Delivery predictor — falls back to default speed when profile absent</div>
+        <div class="test-case">Delivery predictor — async non-blocking</div>
+        <div class="test-case">Delivery predictor — multi-leg route sums correctly</div>
+        <div class="test-case">Delivery predictor — zero-distance leg returns zero ETA</div>
+      </div>
+
+      <div class="test-group">
+        <div class="test-group-title">Fraud Detection — Week 5 <span class="tag tag-green" style="margin-left:6px">19 tests</span></div>
+        <div class="test-case">CUSUM — S+ increases with positive drift</div>
+        <div class="test-case">CUSUM — S− increases with negative drift</div>
+        <div class="test-case">CUSUM — alarm fires when S &gt; h</div>
+        <div class="test-case">CUSUM — resets to zero after alarm acknowledged</div>
+        <div class="test-case">CUSUM — processBatch returns alarm index</div>
+        <div class="test-case">CUSUM — k=0 accumulates all deviations</div>
+        <div class="test-case">CUSUM — symmetric k/h configurable</div>
+        <div class="test-case">Fraud detector — Z-score below 2σ → no alert</div>
+        <div class="test-case">Fraud detector — 2σ → low severity</div>
+        <div class="test-case">Fraud detector — 3σ → medium severity</div>
+        <div class="test-case">Fraud detector — 4σ → high severity</div>
+        <div class="test-case">Fraud detector — 5σ → critical severity</div>
+        <div class="test-case">Fraud detector — uses baseline mean + stddev correctly</div>
+        <div class="test-case">Fraud baseline — Welford mean converges correctly</div>
+        <div class="test-case">Fraud baseline — Welford stddev matches batch stddev</div>
+        <div class="test-case">Fraud baseline — single value stddev is 0</div>
+        <div class="test-case">Fraud baseline — trainBaseline bulk loads N points</div>
+        <div class="test-case">Fraud baseline — incremental update maintains accuracy</div>
+        <div class="test-case">Fraud baseline — M2 column persisted and reloaded correctly</div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ PROGRESS ══ -->
+  <section id="progress">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(108,99,255,0.1)">📊</div>
+      <h2>Overall Build Progress</h2>
+    </div>
+
+    <div class="progress-section">
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Core Infrastructure (Layer 1–4)</span>
+          <span style="color:var(--done)">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--done),#00ffbb)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Algorithm Engines (Layer 5)</span>
+          <span style="color:var(--done)">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--done),#00ffbb)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Job Orchestration (Layer 6)</span>
+          <span style="color:var(--done)">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--done),#00ffbb)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Real-Time WebSocket (Layer 7)</span>
+          <span style="color:var(--done)">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--done),#00ffbb)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Client Surfaces (Layer 8)</span>
+          <span style="color:var(--future)">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:0%;background:var(--future)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Database Schema</span>
+          <span style="color:var(--done)">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--done),#00ffbb)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>API Endpoints</span>
+          <span style="color:var(--done)">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--accent),#aa88ff)"></div>
+        </div>
+      </div>
+
+      <div class="progress-item">
+        <div class="progress-header">
+          <span>Test Coverage</span>
+          <span style="color:var(--done)">128 tests · 128/128 passing</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:100%;background:linear-gradient(90deg,var(--done),#00ffbb)"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══ NEXT ══ -->
+  <section id="next">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(255,209,102,0.08)">🚀</div>
+      <h2>Week 6 — What's Next</h2>
+    </div>
+
+    <div class="week-grid">
+      <div class="week-card future">
+        <div class="week-num">Candidate Task 1</div>
+        <div class="week-title">React Web Dashboard</div>
+        <ul class="week-items">
+          <li>Layer 8: first client surface</li>
+          <li>Live shipment map with WebSocket feed</li>
+          <li>Route optimizer UI — drag-and-drop stops</li>
+          <li>Analytics charts (demand forecast, delivery stats)</li>
+          <li>Fraud alert panel with severity colour coding</li>
+        </ul>
+      </div>
+
+      <div class="week-card future">
+        <div class="week-num">Candidate Task 2</div>
+        <div class="week-title">Multi-Org Admin + Billing</div>
+        <ul class="week-items">
+          <li>Super-admin role scoped above org_id</li>
+          <li>Usage metering per org (API calls, routes optimised)</li>
+          <li>Feature flags per org (JSONB in organizations table)</li>
+          <li>Audit log (append-only, who did what, when)</li>
+        </ul>
+      </div>
+
+      <div class="week-card future">
+        <div class="week-num">Candidate Task 3</div>
+        <div class="week-title">Driver Mobile App (React Native)</div>
+        <ul class="week-items">
+          <li>Layer 8: second client surface</li>
+          <li>GPS location push every 30s via WebSocket</li>
+          <li>Route turn-by-turn with stop sequence</li>
+          <li>Delivery confirmation + signature capture</li>
+          <li>Offline-first with local event queue sync</li>
+        </ul>
+      </div>
+
+      <div class="week-card future">
+        <div class="week-num">Candidate Task 4</div>
+        <div class="week-title">Load Testing + Production Hardening</div>
+        <ul class="week-items">
+          <li>k6 / autocannon load tests at 10k req/s</li>
+          <li>PostgreSQL read-replica routing under load</li>
+          <li>Redis Sentinel failover drill</li>
+          <li>Structured error budget + SLO definition</li>
+          <li>Dockerfile + docker-compose for full stack</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <div class="footer">
+    <div>
+      <div class="footer-brand">PILOTS</div>
+      <div>Prism Intelligent Logistics & Operations Tracking System</div>
+    </div>
+    <div style="text-align:right">
+      <div>Week 5 of 8+ complete</div>
+      <div>128 tests · 0 failures · TypeScript strict</div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+// Active nav link on scroll
+const sections = document.querySelectorAll('section[id], div[id]');
+const navLinks = document.querySelectorAll('nav a');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(a => a.classList.remove('active'));
+      const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+
+sections.forEach(s => observer.observe(s));
+
+// Animate progress bars on load
+window.addEventListener('load', () => {
+  document.querySelectorAll('.progress-fill').forEach(bar => {
+    const w = bar.style.width;
+    bar.style.width = '0%';
+    setTimeout(() => { bar.style.width = w; }, 200);
+  });
+});
+</script>
+
+</body>
+</html>

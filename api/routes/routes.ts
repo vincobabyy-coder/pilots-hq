@@ -116,6 +116,40 @@ export function routesRouter(): Router {
     }
   })
 
+  // POST /:id/complete
+  router.post('/:id/complete', async (req, res) => {
+    const body = req.body as Record<string, unknown>
+
+    if (!body.startedAt || typeof body.startedAt !== 'string') {
+      res.status(400).fail('VALIDATION_ERROR', 'startedAt is required', 400); return
+    }
+    if (!Array.isArray(body.stopActualArrivalMinutes) || body.stopActualArrivalMinutes.length === 0) {
+      res.status(400).fail('VALIDATION_ERROR', 'stopActualArrivalMinutes must be a non-empty array', 400); return
+    }
+    if (!body.stopActualArrivalMinutes.every((x: unknown) => typeof x === 'number' && x >= 0)) {
+      res.status(400).fail('VALIDATION_ERROR', 'stopActualArrivalMinutes must be an array of non-negative numbers', 400); return
+    }
+
+    try {
+      const route = await routeService.completeRoute(
+        req.orgId!,
+        req.params.id,
+        {
+          startedAt: body.startedAt as string,
+          stopActualArrivalMinutes: body.stopActualArrivalMinutes as number[],
+        }
+      )
+      res.ok({ route })
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; code?: string; message?: string }
+      if (e.statusCode) {
+        res.status(e.statusCode).fail(e.code ?? 'ERROR', e.message ?? 'Error', e.statusCode)
+        return
+      }
+      throw err
+    }
+  })
+
   // PATCH /:id/reassign
   router.patch('/:id/reassign', async (req, res) => {
     const body = req.body as Record<string, unknown>

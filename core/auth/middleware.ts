@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/refresh',
   'GET /api/v1/tracking',  // customer portal — prefix match
+  'GET /api/v1/health',
 ]
 
 function isPublic(method: string, path: string): boolean {

@@ -13,6 +13,7 @@ import { warehousesRouter } from './routes/warehouses'
 import { ordersRouter } from './routes/orders'
 import { analyticsRouter } from './routes/analytics'
 import { fraudRouter } from './routes/fraud'
+import { healthRouter } from './routes/health'
 import { startScheduler } from '../core/queue/scheduler'
 import { migrate } from '../core/db/migrator'
 import { logger } from '../core/logger/logger'
@@ -51,7 +52,8 @@ async function bootstrap(): Promise<void> {
   server.use(tenantContext)
   server.use(rateLimiter())
 
-  // Routes
+  // Routes — health is public (no auth required)
+  server.mount('/api/v1/health', healthRouter())
   server.mount('/api/v1/auth', authRouter())
   server.mount('/api/v1/routes', routesRouter())
   server.mount('/api/v1/shipments', shipmentsRouter())

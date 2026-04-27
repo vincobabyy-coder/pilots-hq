@@ -1,7 +1,8 @@
 import { query, queryOne } from '../../core/db/pool'
 import { enqueue, getJob, Job } from '../../core/queue/simple-queue'
 import { solveVRP } from '../../engines/route-optimizer/vrp'
-import { SolverInput, Stop, Vehicle } from '../../engines/route-optimizer/types'
+import { SolverInput, Stop, Vehicle, RouteStop } from '../../engines/route-optimizer/types'
+import { updateSpeedProfile } from '../../engines/route-optimizer/distance-matrix'
 import { logger } from '../../core/logger/logger'
 
 export interface OptimizeRequest {
@@ -23,8 +24,16 @@ export interface RouteRow extends Record<string, unknown> {
   stops: unknown
   totalDistanceKm: number | null
   estimatedDurationMinutes: number | null
+  actualDurationMinutes: number | null
+  startedAt: string | null
+  completedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface CompleteRouteRequest {
+  startedAt: string           // ISO 8601 datetime when the route departed the warehouse
+  stopActualArrivalMinutes: number[]  // one entry per stop: actual minutes elapsed from route start
 }
 
 // ---------------------------------------------------------------------------
@@ -215,5 +224,66 @@ export async function reassignRoute(
     'UPDATE routes SET driver_id = COALESCE($1, driver_id), vehicle_id = COALESCE($2, vehicle_id), updated_at = NOW() WHERE id = $3 RETURNING *',
     [driverId ?? null, vehicleId ?? null, routeId]
   )
+  return rows[0]
+}
+
+export async function completeRoute(
+  orgId: string,
+  routeId: string,
+  req: CompleteRouteRequest
+): Promise<RouteRow> {
+  const { startedAt, stopActualArrivalMinutes } = req
+
+  // 1. Fetch and validate route
+  const route = await getRoute(orgId, routeId)
+  if (!route) throw makeError('Route not found', 'ROUTE_NOT_FOUND', 404)
+  if (route.status !== 'confirmed') {
+    throw makeError('Route must be confirmed before it can be completed', 'INVALID_ROUTE_STATUS', 409)
+  }
+
+  // 2. Parse stops JSONB
+  const stops = route.stops as RouteStop[]
+  if (stopActualArrivalMinutes.length !== stops.length) {
+    throw makeError(
+      `stopActualArrivalMinutes must have ${stops.length} entries, one per stop`,
+      'VALIDATION_ERROR',
+      400
+    )
+  }
+
+  // 3. Feed each leg's actual speed into the speed profile
+  const startedAtDate = new Date(startedAt)
+  const dayOfWeek = startedAtDate.getDay()  // 0=Sunday … 6=Saturday
+
+  for (let i = 0; i < stops.length; i++) {
+    const distanceKm = stops[i].distanceFromPrevKm
+    const departureMinutes = i === 0 ? 0 : stopActualArrivalMinutes[i - 1]
+    const legTravelMinutes = stopActualArrivalMinutes[i] - departureMinutes
+
+    // Skip degenerate legs (co-located stops or bad data)
+    if (distanceKm <= 0 || legTravelMinutes <= 0) continue
+
+    const departureTime = new Date(startedAtDate.getTime() + departureMinutes * 60_000)
+    const hourOfDay = departureTime.getHours()
+    const observedSpeedKmh = (distanceKm / legTravelMinutes) * 60
+
+    await updateSpeedProfile(orgId, hourOfDay, dayOfWeek, observedSpeedKmh)
+  }
+
+  // 4. Mark route completed
+  const actualDurationMinutes = Math.round(stopActualArrivalMinutes[stopActualArrivalMinutes.length - 1])
+  const rows = await query<RouteRow>(
+    `UPDATE routes
+     SET status = 'completed',
+         started_at = $1,
+         completed_at = NOW(),
+         actual_duration_minutes = $2,
+         updated_at = NOW()
+     WHERE id = $3
+     RETURNING *`,
+    [startedAt, actualDurationMinutes, routeId]
+  )
+
+  logger.info('Route completed, speed profiles updated', { orgId, routeId, stops: stops.length })
   return rows[0]
 }

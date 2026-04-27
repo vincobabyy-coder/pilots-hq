@@ -40,6 +40,16 @@ export interface CacheOptions {
   namespace?: string // default 'global'
 }
 
+export async function pingRedis(): Promise<boolean> {
+  try {
+    const r = getRedis()
+    const pong = await r.ping()
+    return pong === 'PONG'
+  } catch {
+    return false
+  }
+}
+
 export const cache = {
   async get<T>(key: string, opts?: Pick<CacheOptions, 'namespace'>): Promise<T | null> {
     const r = getRedis()

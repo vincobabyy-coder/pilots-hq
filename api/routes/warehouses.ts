@@ -1,6 +1,11 @@
 import { Router } from '../../core/http/router'
-import { query, queryOne } from '../../core/db/pool'
 import { logger } from '../../core/logger/logger'
+import {
+  listWarehouses,
+  getWarehouse,
+  listInventory,
+  upsertInventory,
+} from '../services/warehouse.service'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,18 +31,7 @@ export function warehousesRouter(): Router {
     const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset
 
     try {
-      const warehouses = await query<Record<string, unknown>>(
-        `SELECT w.*,
-           ROUND(CAST(w.current_units AS NUMERIC) / NULLIF(w.capacity_units, 0) * 100, 1) AS utilization_pct,
-           COUNT(i.sku) AS sku_count
-         FROM warehouses w
-         LEFT JOIN warehouse_inventory i ON i.warehouse_id = w.id
-         WHERE w.org_id = $1
-         GROUP BY w.id
-         ORDER BY w.name
-         LIMIT $2 OFFSET $3`,
-        [req.orgId!, limit, offset]
-      )
+      const { warehouses } = await listWarehouses(req.orgId!, limit, offset)
       res.ok({ warehouses, meta: { limit, offset } })
     } catch (err) {
       logger.error('Failed to list warehouses', { orgId: req.orgId, error: (err as Error).message })
@@ -54,17 +48,7 @@ export function warehousesRouter(): Router {
     }
 
     try {
-      const warehouse = await queryOne<Record<string, unknown>>(
-        `SELECT w.*,
-           ROUND(CAST(w.current_units AS NUMERIC) / NULLIF(w.capacity_units, 0) * 100, 1) AS utilization_pct,
-           COUNT(i.sku) AS sku_count
-         FROM warehouses w
-         LEFT JOIN warehouse_inventory i ON i.warehouse_id = w.id
-         WHERE w.org_id = $1 AND w.id = $2
-         GROUP BY w.id
-         ORDER BY w.name`,
-        [req.orgId!, id]
-      )
+      const warehouse = await getWarehouse(req.orgId!, id)
 
       if (!warehouse) {
         res.status(404).fail('WAREHOUSE_NOT_FOUND', 'Warehouse not found', 404); return
@@ -91,28 +75,14 @@ export function warehousesRouter(): Router {
     const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset
 
     try {
-      // Verify warehouse belongs to org before exposing inventory
-      const warehouse = await queryOne<{ id: string }>(
-        'SELECT id FROM warehouses WHERE id = $1 AND org_id = $2',
-        [id, req.orgId!]
-      )
-      if (!warehouse) {
+      const result = await listInventory(req.orgId!, id, limit, offset)
+
+      // total === -1 is the sentinel meaning warehouse not found
+      if (result.total === -1) {
         res.status(404).fail('WAREHOUSE_NOT_FOUND', 'Warehouse not found', 404); return
       }
 
-      const [inventoryRows, countRows] = await Promise.all([
-        query<Record<string, unknown>>(
-          'SELECT * FROM warehouse_inventory WHERE warehouse_id = $1 ORDER BY sku LIMIT $2 OFFSET $3',
-          [id, limit, offset]
-        ),
-        query<{ total: string }>(
-          'SELECT COUNT(*) AS total FROM warehouse_inventory WHERE warehouse_id = $1',
-          [id]
-        ),
-      ])
-
-      const total = parseInt(countRows[0]?.total ?? '0', 10)
-      res.ok({ inventory: inventoryRows, meta: { total, limit, offset } })
+      res.ok({ inventory: result.items, meta: { total: result.total, limit, offset } })
     } catch (err) {
       logger.error('Failed to list inventory', { orgId: req.orgId, warehouseId: id, error: (err as Error).message })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
@@ -173,45 +143,20 @@ export function warehousesRouter(): Router {
     }
 
     try {
-      // Verify warehouse belongs to org
-      const warehouse = await queryOne<{ id: string }>(
-        'SELECT id FROM warehouses WHERE id = $1 AND org_id = $2',
-        [id, req.orgId!]
+      const inventory = await upsertInventory(
+        req.orgId!,
+        id,
+        sku,
+        (body.quantity as number) ?? 0,
+        (body.reservedQuantity as number) ?? 0,
+        body.unitCost as number | undefined
       )
-      if (!warehouse) {
+
+      if (!inventory) {
         res.status(404).fail('WAREHOUSE_NOT_FOUND', 'Warehouse not found', 404); return
       }
 
-      // Upsert inventory row
-      const inventoryRows = await query<Record<string, unknown>>(
-        `INSERT INTO warehouse_inventory (warehouse_id, sku, quantity, reserved_quantity, unit_cost, last_updated)
-         VALUES ($1, $2, $3, $4, $5, NOW())
-         ON CONFLICT (warehouse_id, sku) DO UPDATE SET
-           quantity          = EXCLUDED.quantity,
-           reserved_quantity = EXCLUDED.reserved_quantity,
-           unit_cost         = COALESCE(EXCLUDED.unit_cost, warehouse_inventory.unit_cost),
-           last_updated      = NOW()
-         RETURNING *`,
-        [
-          id,
-          sku,
-          body.quantity ?? 0,
-          body.reservedQuantity ?? 0,
-          body.unitCost ?? null,
-        ]
-      )
-
-      // Sync warehouses.current_units to the sum of all inventory quantities
-      await query(
-        `UPDATE warehouses
-         SET current_units = (
-           SELECT COALESCE(SUM(quantity), 0) FROM warehouse_inventory WHERE warehouse_id = $1
-         ), updated_at = NOW()
-         WHERE id = $1 AND org_id = $2`,
-        [id, req.orgId!]
-      )
-
-      res.ok({ inventory: inventoryRows[0] })
+      res.ok({ inventory })
     } catch (err) {
       logger.error('Failed to upsert inventory', { orgId: req.orgId, warehouseId: id, sku, error: (err as Error).message })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
