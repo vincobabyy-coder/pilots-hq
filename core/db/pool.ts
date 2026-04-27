@@ -1,4 +1,5 @@
 import { Pool, PoolClient, QueryResult } from 'pg'
+import { logger } from '../logger/logger'
 
 let pool: Pool | null = null
 
@@ -11,7 +12,7 @@ export function getPool(): Pool {
       connectionTimeoutMillis: 5_000,
     })
     pool.on('error', (err) => {
-      process.stderr.write(JSON.stringify({ level: 'error', msg: 'pg pool error', err: err.message }) + '\n')
+      logger.error('PostgreSQL pool error', { error: (err as Error).message })
     })
   }
   return pool
@@ -56,12 +57,19 @@ export async function transaction<T>(
 }
 
 let replicaPool: Pool | null = null
+let replicaFallbackWarned = false
 
 function getReplicaPool(): Pool {
   if (!replicaPool) {
     const replicaUrl = process.env.POSTGRES_REPLICA_URL
-    // Falls back to primary if replica not configured
+    if (!replicaUrl && !replicaFallbackWarned) {
+      logger.warn('POSTGRES_REPLICA_URL not set — queryReplica() will use primary pool')
+      replicaFallbackWarned = true
+    }
     replicaPool = new Pool({ connectionString: replicaUrl ?? process.env.DATABASE_URL })
+    replicaPool.on('error', (err) => {
+      logger.error('PostgreSQL replica pool error', { error: (err as Error).message })
+    })
   }
   return replicaPool
 }

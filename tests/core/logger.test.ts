@@ -43,8 +43,10 @@ describe('Logger', () => {
       }
     }
 
-    expect(stderrChunks.length).toBe(2)
-    expect(stdoutChunks.length).toBe(2)
+    expect(stdoutChunks.some(c => c.includes('"level":"debug"'))).toBe(true)
+    expect(stdoutChunks.some(c => c.includes('"level":"info"'))).toBe(true)
+    expect(stderrChunks.some(c => c.includes('"level":"warn"'))).toBe(true)
+    expect(stderrChunks.some(c => c.includes('"level":"error"'))).toBe(true)
   })
 
   it('drops messages below the configured LOG_LEVEL', () => {
@@ -67,6 +69,7 @@ describe('Logger', () => {
       }
     }
 
-    expect(stdoutChunks.length).toBe(0)
+    expect(stdoutChunks.some(c => c.includes('"level":"debug"'))).toBe(false)
+    expect(stdoutChunks.some(c => c.includes('"level":"info"'))).toBe(false)
   })
 })

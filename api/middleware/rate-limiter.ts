@@ -1,6 +1,7 @@
 import { Middleware } from '../../core/http/types'
 import { logger } from '../../core/logger/logger'
 import Redis from 'ioredis'
+import { randomBytes } from 'crypto'
 
 let redis: Redis | null = null
 
@@ -10,7 +11,8 @@ function getRedis(): Redis {
     if (sentinelHosts) {
       const sentinels = sentinelHosts.split(',').map(hp => {
         const [host, port] = hp.trim().split(':')
-        return { host, port: parseInt(port ?? '26379', 10) }
+        const parsedPort = parseInt(port ?? '26379', 10)
+        return { host, port: isNaN(parsedPort) ? 26379 : parsedPort }
       })
       redis = new Redis({
         sentinels,
@@ -45,7 +47,11 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
 
 export function rateLimiter(config?: RateLimitConfig): Middleware {
   return async (req, res, next) => {
-    const key = `rl:${req.headers['x-forwarded-for'] ?? req.headers['host'] ?? 'unknown'}:${req.method}:${req.path}`
+    const rawForwardedFor = req.headers['x-forwarded-for']
+    const clientIp = Array.isArray(rawForwardedFor)
+      ? rawForwardedFor[0].split(',')[0].trim()
+      : rawForwardedFor?.split(',')[0].trim()
+    const key = `rl:${clientIp ?? req.headers['host'] ?? 'unknown'}:${req.method}:${req.path}`
     const limit = config ?? DEFAULT_LIMITS[`${req.method} ${req.path}`] ?? DEFAULT_LIMITS['default']
 
     try {
@@ -67,8 +73,10 @@ export function rateLimiter(config?: RateLimitConfig): Middleware {
         return
       }
 
-      await r.zadd(key, now, `${now}-${Math.random()}`)
-      await r.pexpire(key, limit.windowMs)
+      await r.multi()
+        .zadd(key, now, `${now}-${randomBytes(8).toString('hex')}`)
+        .pexpire(key, limit.windowMs)
+        .exec()
     } catch {
       // Redis unavailable — fail open (allow request through, log once via the error handler above)
     }
