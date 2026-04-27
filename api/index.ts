@@ -6,6 +6,7 @@ import { rateLimiter } from './middleware/rate-limiter'
 import { tenantContext } from './middleware/tenant'
 import { errorHandler } from './middleware/error-handler'
 import { authRouter } from './routes/auth'
+import { routesRouter } from './routes/routes'
 import { migrate } from '../core/db/migrator'
 import { logger } from '../core/logger/logger'
 
@@ -44,6 +45,7 @@ async function bootstrap(): Promise<void> {
 
   // Routes
   server.mount('/api/v1/auth', authRouter())
+  server.mount('/api/v1/routes', routesRouter())
 
   const port = parseInt(process.env.PORT ?? '3000')
   server.listen(port, () => {
