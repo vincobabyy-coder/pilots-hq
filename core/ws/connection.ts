@@ -65,10 +65,7 @@ export class WsConnection extends EventEmitter {
       } else if (payloadLen === 127) {
         // Next 8 bytes hold the real length (uint64 BE)
         if (this.buffer.length < 10) break
-        // We use Number() — safe for payloads under 2GB (2^31 bytes)
-        const high = this.buffer.readUInt32BE(2)
-        const low = this.buffer.readUInt32BE(6)
-        payloadLen = high * 0x100000000 + low
+        payloadLen = Number(this.buffer.readBigUInt64BE(2))
         headerLen += 8
       }
 
@@ -191,7 +188,7 @@ export class WsConnection extends EventEmitter {
 
     this.sendFrame(0x8, payload)
     this.alive = false
-    this.socket.end()
+    this.socket.destroy()
   }
 
   /** Whether the connection is still considered open */
