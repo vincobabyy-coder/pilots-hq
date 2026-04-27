@@ -95,13 +95,17 @@ export async function optimizeRoutes(orgId: string, req: OptimizeRequest): Promi
   }
 
   // 5. Enqueue job
-  const jobId = await enqueue('route-optimization', { orgId, input })
+  const jobId = await enqueue('route-optimization', { orgId, warehouseId, input })
   logger.info('Route optimization enqueued', { orgId, jobId, warehouseId, date })
 
   return jobId
 }
 
-export async function runOptimizationJob(orgId: string, input: SolverInput): Promise<void> {
+export async function runOptimizationJob(
+  orgId: string,
+  warehouseId: string,
+  input: SolverInput
+): Promise<void> {
   const result = await solveVRP(input, 30_000)
   logger.info('VRP solved', { orgId, routes: result.routes.length, totalDistanceKm: result.totalDistanceKm })
 
@@ -121,7 +125,7 @@ export async function runOptimizationJob(orgId: string, input: SolverInput): Pro
         routeNumber,
         input.date,
         route.vehicleId,
-        input.warehouseLat !== undefined ? null : null, // warehouse id is not in SolverInput; use null
+        warehouseId,
         JSON.stringify(route.stops),
         route.totalDistanceKm,
         estimatedDurationMinutes,

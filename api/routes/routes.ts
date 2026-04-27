@@ -33,8 +33,14 @@ export function routesRouter(): Router {
     if (!Array.isArray(body.vehicleIds) || body.vehicleIds.length === 0) {
       res.status(400).fail('VALIDATION_ERROR', 'vehicleIds must be a non-empty array', 400); return
     }
+    if (!body.vehicleIds.every((x: unknown) => typeof x === 'string')) {
+      res.status(400).fail('VALIDATION_ERROR', 'vehicleIds must be an array of strings', 400); return
+    }
     if (!Array.isArray(body.orderIds) || body.orderIds.length === 0) {
       res.status(400).fail('VALIDATION_ERROR', 'orderIds must be a non-empty array', 400); return
+    }
+    if (!body.orderIds.every((x: unknown) => typeof x === 'string')) {
+      res.status(400).fail('VALIDATION_ERROR', 'orderIds must be an array of strings', 400); return
     }
 
     try {
@@ -154,8 +160,8 @@ export function routesRouter(): Router {
 }
 
 // Start the route optimization worker when this module loads
-const worker = startWorker<{ orgId: string; input: SolverInput }>('route-optimization', async (job) => {
-  await routeService.runOptimizationJob(job.payload.orgId, job.payload.input)
+const worker = startWorker<{ orgId: string; warehouseId: string; input: SolverInput }>('route-optimization', async (job) => {
+  await routeService.runOptimizationJob(job.payload.orgId, job.payload.warehouseId, job.payload.input)
 })
 logger.info('Route optimization worker started')
 // worker is kept running as long as the process is alive
