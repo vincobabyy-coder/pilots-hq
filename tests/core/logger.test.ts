@@ -16,6 +16,10 @@ describe('Logger', () => {
   })
 
   it('routes warn and error to stderr, info and debug to stdout', () => {
+    const savedLevel = process.env.LOG_LEVEL
+    // Force debug level so all four messages are emitted regardless of env config
+    process.env.LOG_LEVEL = 'debug'
+
     const stderrChunks: string[] = []
     const stdoutChunks: string[] = []
     const origStderr = process.stderr.write.bind(process.stderr)
@@ -32,9 +36,37 @@ describe('Logger', () => {
     } finally {
       process.stderr.write = origStderr
       process.stdout.write = origStdout
+      if (savedLevel === undefined) {
+        delete process.env.LOG_LEVEL
+      } else {
+        process.env.LOG_LEVEL = savedLevel
+      }
     }
 
     expect(stderrChunks.length).toBe(2)
     expect(stdoutChunks.length).toBe(2)
+  })
+
+  it('drops messages below the configured LOG_LEVEL', () => {
+    const savedLevel = process.env.LOG_LEVEL
+    process.env.LOG_LEVEL = 'warn'
+
+    const stdoutChunks: string[] = []
+    const origStdout = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((chunk: unknown) => { stdoutChunks.push(String(chunk)); return true }) as typeof process.stdout.write
+
+    try {
+      logger.debug('should be dropped')
+      logger.info('also should be dropped')
+    } finally {
+      process.stdout.write = origStdout
+      if (savedLevel === undefined) {
+        delete process.env.LOG_LEVEL
+      } else {
+        process.env.LOG_LEVEL = savedLevel
+      }
+    }
+
+    expect(stdoutChunks.length).toBe(0)
   })
 })

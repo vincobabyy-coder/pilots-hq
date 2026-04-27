@@ -6,12 +6,26 @@ let redis: Redis | null = null
 
 function getRedis(): Redis {
   if (!redis) {
-    redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-      // Fail fast instead of queuing retries indefinitely
-      maxRetriesPerRequest: 1,
-      lazyConnect: true,
-      enableOfflineQueue: false,
-    })
+    const sentinelHosts = process.env.REDIS_SENTINEL_HOSTS
+    if (sentinelHosts) {
+      const sentinels = sentinelHosts.split(',').map(hp => {
+        const [host, port] = hp.trim().split(':')
+        return { host, port: parseInt(port ?? '26379', 10) }
+      })
+      redis = new Redis({
+        sentinels,
+        name: process.env.REDIS_SENTINEL_NAME ?? 'mymaster',
+        maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
+      })
+    } else {
+      redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+        // Fail fast instead of queuing retries indefinitely
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+        enableOfflineQueue: false,
+      })
+    }
     redis.on('error', (err) => {
       logger.warn('Rate limiter Redis unavailable — requests will pass through', { error: err.message })
     })

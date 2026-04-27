@@ -55,6 +55,26 @@ export async function transaction<T>(
   }
 }
 
+let replicaPool: Pool | null = null
+
+function getReplicaPool(): Pool {
+  if (!replicaPool) {
+    const replicaUrl = process.env.POSTGRES_REPLICA_URL
+    // Falls back to primary if replica not configured
+    replicaPool = new Pool({ connectionString: replicaUrl ?? process.env.DATABASE_URL })
+  }
+  return replicaPool
+}
+
+export async function queryReplica<T extends Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  const result = await getReplicaPool().query(sql, params)
+  return result.rows as T[]
+}
+
 export async function closePool(): Promise<void> {
   if (pool) { await pool.end(); pool = null }
+  if (replicaPool) { await replicaPool.end(); replicaPool = null }
 }
