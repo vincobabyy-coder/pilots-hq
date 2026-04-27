@@ -11,6 +11,7 @@ import { shipmentsRouter } from './routes/shipments'
 import { driversRouter } from './routes/drivers'
 import { migrate } from '../core/db/migrator'
 import { logger } from '../core/logger/logger'
+import { initWsServer } from './ws-instance'
 
 // Load .env manually
 function loadEnv(): void {
@@ -50,6 +51,36 @@ async function bootstrap(): Promise<void> {
   server.mount('/api/v1/routes', routesRouter())
   server.mount('/api/v1/shipments', shipmentsRouter())
   server.mount('/api/v1/drivers', driversRouter())
+
+  // Create the underlying http.Server before binding so WebSocket can attach.
+  const httpServer = server.initHttpServer()
+
+  // Initialise the WsServer singleton and attach it to the HTTP server.
+  const wsServer = initWsServer(process.env.REDIS_URL)
+  wsServer.attach(httpServer, (conn, req, rooms) => {
+    // Parse room subscription from URL query string: ?room=shipment:abc-123
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    const room = url.searchParams.get('room')
+    if (room) {
+      rooms.join(conn, room)
+      conn.send(JSON.stringify({ type: 'subscribed', room }))
+    }
+
+    conn.on('message', (msg) => {
+      if (msg.type !== 'text') return
+      try {
+        const data = JSON.parse(msg.data) as { action?: string; room?: string }
+        if (data.action === 'join' && data.room) {
+          rooms.join(conn, data.room)
+          conn.send(JSON.stringify({ type: 'subscribed', room: data.room }))
+        } else if (data.action === 'leave' && data.room) {
+          rooms.leave(conn, data.room)
+        }
+      } catch {
+        // ignore malformed JSON
+      }
+    })
+  })
 
   const port = parseInt(process.env.PORT ?? '3000')
   server.listen(port, () => {

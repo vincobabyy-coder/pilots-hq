@@ -1,4 +1,4 @@
-import { createServer, IncomingMessage, ServerResponse } from 'http'
+import { createServer, IncomingMessage, Server, ServerResponse } from 'http'
 import { buildRequest } from './request'
 import { buildResponse } from './response'
 import { Router } from './router'
@@ -8,6 +8,7 @@ import { logger } from '../logger/logger'
 export class PilotsServer {
   private middlewares: Middleware[] = []
   private router = new Router()
+  private _httpServer: Server | null = null
 
   use(middleware: Middleware): this {
     this.middlewares.push(middleware)
@@ -54,12 +55,34 @@ export class PilotsServer {
     }
   }
 
+  /**
+   * Creates the underlying http.Server without binding to a port.
+   * Call this before listen() when you need to attach WebSocket upgrade
+   * handlers (or other server-level listeners) prior to accepting connections.
+   * Calling listen() will reuse the server created here.
+   */
+  initHttpServer(): Server {
+    if (!this._httpServer) {
+      this._httpServer = createServer(async (raw: IncomingMessage, rawRes: ServerResponse) => {
+        const req = await buildRequest(raw)
+        const res = buildResponse(rawRes, req.requestId)
+        await this.handle(req, res)
+      })
+    }
+    return this._httpServer
+  }
+
+  /** Exposes the underlying http.Server after initHttpServer() or listen() has been called. */
+  get httpServer(): Server {
+    if (!this._httpServer) {
+      throw new Error('httpServer is not available before initHttpServer() or listen() is called')
+    }
+    return this._httpServer
+  }
+
   listen(port: number, onReady?: () => void): void {
-    const server = createServer(async (raw: IncomingMessage, rawRes: ServerResponse) => {
-      const req = await buildRequest(raw)
-      const res = buildResponse(rawRes, req.requestId)
-      await this.handle(req, res)
-    })
+    // Reuse the server created by initHttpServer() if already called; otherwise create it now.
+    const server = this.initHttpServer()
     server.listen(port, () => {
       logger.info(`PILOTS server listening`, { port })
       onReady?.()

@@ -3,6 +3,7 @@ import { recordEvent } from '../../engines/tracking/commands'
 import { getCurrentState, getEventLog } from '../../engines/tracking/queries'
 import { TrackingEvent, ShipmentState } from '../../engines/tracking/types'
 import { logger } from '../../core/logger/logger'
+import { getWsServer } from '../ws-instance'
 
 export interface CreateShipmentInput {
   orgId: string
@@ -195,9 +196,19 @@ export async function updateDriverLocation(
     [driverId, orgId]
   )
 
-  // 3. Record location_updated event for each active shipment
+  // 3. Record location_updated event for each active shipment and broadcast via WebSocket.
+  const ws = getWsServer()
   for (const { id: shipmentId } of activeShipments) {
     await recordEvent(shipmentId, 'location_updated', { lat, lon })
+    if (ws) {
+      ws.broadcastToRoom(`shipment:${shipmentId}`, JSON.stringify({
+        type: 'location_updated',
+        shipmentId,
+        lat,
+        lon,
+        ts: new Date().toISOString(),
+      }))
+    }
   }
 
   logger.info('Driver location updated', { orgId, driverId, lat, lon, activeShipments: activeShipments.length })
