@@ -53,6 +53,9 @@ export async function travelTimeMinutes(
   departureHour: number, // 0–23
   dayOfWeek: number // 0 = Sunday … 6 = Saturday
 ): Promise<number> {
+  if (departureHour < 0 || departureHour > 23) throw new RangeError(`departureHour must be 0–23, got ${departureHour}`)
+  if (dayOfWeek < 0 || dayOfWeek > 6) throw new RangeError(`dayOfWeek must be 0–6, got ${dayOfWeek}`)
+
   const distanceKm = haversineKm(lat1, lon1, lat2, lon2)
 
   // Query speed profile
@@ -67,7 +70,9 @@ export async function travelTimeMinutes(
     [orgId, departureHour, dayOfWeek]
   )
 
-  const speedKmh = profile?.avg_speed_kmh ?? 40.0
+  const speedKmh = (profile?.avg_speed_kmh && profile.avg_speed_kmh > 0)
+    ? profile.avg_speed_kmh
+    : 40.0
   const timeMinutes = (distanceKm / speedKmh) * 60
 
   return timeMinutes
@@ -85,6 +90,9 @@ export async function updateSpeedProfile(
   dayOfWeek: number,
   observedSpeedKmh: number
 ): Promise<void> {
+  if (hourOfDay < 0 || hourOfDay > 23) throw new RangeError(`hourOfDay must be 0–23, got ${hourOfDay}`)
+  if (dayOfWeek < 0 || dayOfWeek > 6) throw new RangeError(`dayOfWeek must be 0–6, got ${dayOfWeek}`)
+
   await query(
     `INSERT INTO speed_profiles (org_id, hour_of_day, day_of_week, avg_speed_kmh, sample_count)
      VALUES ($1, $2, $3, $4, 1)
