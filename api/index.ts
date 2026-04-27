@@ -9,6 +9,9 @@ import { authRouter } from './routes/auth'
 import { routesRouter } from './routes/routes'
 import { shipmentsRouter } from './routes/shipments'
 import { driversRouter } from './routes/drivers'
+import { warehousesRouter } from './routes/warehouses'
+import { ordersRouter } from './routes/orders'
+import { startScheduler } from '../core/queue/scheduler'
 import { migrate } from '../core/db/migrator'
 import { logger } from '../core/logger/logger'
 import { initWsServer } from './ws-instance'
@@ -51,6 +54,8 @@ async function bootstrap(): Promise<void> {
   server.mount('/api/v1/routes', routesRouter())
   server.mount('/api/v1/shipments', shipmentsRouter())
   server.mount('/api/v1/drivers', driversRouter())
+  server.mount('/api/v1/warehouses', warehousesRouter())
+  server.mount('/api/v1/orders', ordersRouter())
 
   // Create the underlying http.Server before binding so WebSocket can attach.
   const httpServer = server.initHttpServer()
@@ -81,6 +86,9 @@ async function bootstrap(): Promise<void> {
       }
     })
   })
+
+  // Start recurring job scheduler (distributed lock ensures single-instance execution)
+  startScheduler()
 
   const port = parseInt(process.env.PORT ?? '3000')
   server.listen(port, () => {

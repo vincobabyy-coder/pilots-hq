@@ -1,4 +1,3 @@
-// engines/allocation/hungarian.ts
 import { buildCostMatrix, AllocationOrder, AllocationWarehouse } from './bipartite-graph'
 
 export class AllocationError extends Error {
@@ -16,94 +15,73 @@ export function hungarian(costMatrix: number[][]): number[] {
   const numRows = costMatrix.length
   const numCols = costMatrix[0].length
 
-  // Validate rectangular
   for (let i = 0; i < numRows; i++) {
     if (costMatrix[i].length !== numCols) {
       throw new AllocationError('Cost matrix must be rectangular (all rows same length)')
     }
   }
 
-  // Pad to square
   const n = Math.max(numRows, numCols)
-  const mat: number[][] = []
-  for (let i = 0; i < n; i++) {
-    mat.push([])
-    for (let j = 0; j < n; j++) {
-      if (i < numRows && j < numCols) {
-        mat[i][j] = costMatrix[i][j]
-      } else {
-        mat[i][j] = PADDING
-      }
-    }
+
+  // Accessor for padded n×n matrix (1-indexed: rows 1..n, cols 1..n)
+  const mat = (i: number, j: number): number => {
+    const r = i - 1
+    const c = j - 1
+    return r < numRows && c < numCols ? costMatrix[r][c] : PADDING
   }
 
-  // Step 1: Row reduction
-  for (let i = 0; i < n; i++) {
-    const rowMin = Math.min(...mat[i])
-    for (let j = 0; j < n; j++) mat[i][j] -= rowMin
-  }
+  // Kuhn-Munkres "shortest augmenting path" variant — O(n³), provably correct
+  // u[i] = row potential, v[j] = column potential (1-indexed)
+  // p[j] = row currently assigned to column j (0 = unassigned)
+  const u   = new Array<number>(n + 1).fill(0)
+  const v   = new Array<number>(n + 1).fill(0)
+  const p   = new Array<number>(n + 1).fill(0)
+  const way = new Array<number>(n + 1).fill(0)
 
-  // Step 2: Column reduction
-  for (let j = 0; j < n; j++) {
-    let colMin = Infinity
-    for (let i = 0; i < n; i++) if (mat[i][j] < colMin) colMin = mat[i][j]
-    for (let i = 0; i < n; i++) mat[i][j] -= colMin
-  }
+  for (let i = 1; i <= n; i++) {
+    p[0] = i
+    let j0 = 0
+    const minDist = new Array<number>(n + 1).fill(Infinity)
+    const used    = new Array<boolean>(n + 1).fill(false)
 
-  const assignment = new Array<number>(n).fill(-1)
-  const rowCovered = new Array<boolean>(n).fill(false)
-  const colCovered = new Array<boolean>(n).fill(false)
+    do {
+      used[j0] = true
+      const i0 = p[j0]
+      let delta = Infinity
+      let j1 = -1
 
-  for (let iter = 0; iter < n * 2; iter++) {
-    // Reset covers
-    rowCovered.fill(false)
-    colCovered.fill(false)
-    assignment.fill(-1)
-
-    // Greedy zero assignment
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        if (mat[i][j] === 0 && !colCovered[j]) {
-          assignment[i] = j
-          colCovered[j] = true
-          break
+      for (let j = 1; j <= n; j++) {
+        if (!used[j]) {
+          const cur = mat(i0, j) - u[i0] - v[j]
+          if (cur < minDist[j]) { minDist[j] = cur; way[j] = j0 }
+          if (minDist[j] < delta) { delta = minDist[j]; j1 = j }
         }
       }
-    }
 
-    // Count covered columns
-    const coveredCount = colCovered.filter(Boolean).length
-    if (coveredCount >= n) break
-
-    // Find minimum uncovered value
-    let minVal = Infinity
-    for (let i = 0; i < n; i++) {
-      if (rowCovered[i]) continue
-      for (let j = 0; j < n; j++) {
-        if (!colCovered[j] && mat[i][j] < minVal) minVal = mat[i][j]
+      for (let j = 0; j <= n; j++) {
+        if (used[j]) { u[p[j]] += delta; v[j] -= delta }
+        else minDist[j] -= delta
       }
-    }
 
-    // Subtract from uncovered, add to double-covered
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        if (!rowCovered[i] && !colCovered[j]) mat[i][j] -= minVal
-        else if (rowCovered[i] && colCovered[j]) mat[i][j] += minVal
-      }
-    }
+      j0 = j1 as number
+    } while (p[j0] !== 0)
 
-    // Cover rows with no assignment
-    for (let i = 0; i < n; i++) {
-      if (assignment[i] === -1) rowCovered[i] = true
-    }
-    // Cover columns of assigned zeros
-    for (let i = 0; i < n; i++) {
-      if (assignment[i] !== -1) colCovered[assignment[i]] = true
-    }
+    do {
+      const j1 = way[j0]
+      p[j0] = p[j1]
+      j0 = j1
+    } while (j0 !== 0)
   }
 
-  // Return only the real rows (not padding rows), mapping out-of-bounds columns to -1
-  return assignment.slice(0, numRows).map(j => (j < numCols ? j : -1))
+  // Build 0-indexed assignment for rows 0..numRows-1
+  const assignment = new Array<number>(numRows).fill(-1)
+  for (let j = 1; j <= n; j++) {
+    const row = p[j] - 1
+    if (row >= 0 && row < numRows) {
+      assignment[row] = (j - 1) < numCols ? j - 1 : -1
+    }
+  }
+  return assignment
 }
 
 export function allocate(

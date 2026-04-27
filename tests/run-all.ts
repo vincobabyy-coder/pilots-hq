@@ -9,5 +9,10 @@ import './integration/auth.test'
 import './engines/distance-matrix.test'
 import './engines/greedy-init.test'
 import './engines/vrp.test'
+import './engines/tracking-state-machine.test'
+import './engines/exception-detector.test'
+import './engines/spatial-index.test'
+import './ws/websocket-handshake.test'
+import './engines/hungarian.test'
 
 run().then(code => process.exit(code)).catch(() => process.exit(1))

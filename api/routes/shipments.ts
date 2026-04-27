@@ -1,5 +1,10 @@
 import { Router } from '../../core/http/router'
 import * as shipmentService from '../services/shipment.service'
+import { eventBus } from '../../core/events/event-bus'
+import { updateSpeedProfile } from '../../engines/route-optimizer/distance-matrix'
+import { query } from '../../core/db/pool'
+import { recordEvent } from '../../engines/tracking/commands'
+import { logger } from '../../core/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,6 +121,37 @@ export function shipmentsRouter(): Router {
     }
   })
 
+  // POST /:id/events — append a tracking event
+  router.post('/:id/events', async (req, res) => {
+    const body = req.body as Record<string, unknown>
+    const id = req.params.id
+
+    if (!body.event_type || typeof body.event_type !== 'string') {
+      res.status(400).fail('VALIDATION_ERROR', 'event_type is required and must be a string', 400); return
+    }
+
+    try {
+      const event = await recordEvent(id, body.event_type as import('../../engines/tracking/types').TrackingEventType, {
+        eventStatus: body.event_status as string | undefined,
+        lat: body.lat as number | undefined,
+        lon: body.lon as number | undefined,
+        details: body.details as Record<string, unknown> | undefined,
+      })
+
+      if ((body as Record<string, unknown>).event_type === 'delivered') {
+        eventBus.emit('shipment.delivered', {
+          shipmentId: id,
+          orgId: req.orgId!,
+          deliveredAt: new Date().toISOString(),
+        })
+      }
+
+      res.status(201).ok({ event })
+    } catch (err) {
+      handleServiceError(err, res)
+    }
+  })
+
   // PATCH /:id/exception — mark exception
   router.patch('/:id/exception', async (req, res) => {
     const body = req.body as Record<string, unknown>
@@ -138,3 +174,57 @@ export function shipmentsRouter(): Router {
 
   return router
 }
+
+// ---------------------------------------------------------------------------
+// Speed-profile listener — registered once at module load
+// ---------------------------------------------------------------------------
+
+eventBus.on('shipment.delivered', async ({ shipmentId, orgId }) => {
+  try {
+    const rows = await query(
+      `SELECT r.stops, r.started_at, r.completed_at
+       FROM routes r
+       JOIN shipments s ON s.assigned_route_id = r.id
+       WHERE s.id = $1 AND s.org_id = $2
+         AND r.started_at IS NOT NULL AND r.completed_at IS NOT NULL`,
+      [shipmentId, orgId]
+    )
+    if (rows.length === 0) return
+    const route = rows[0] as { stops: unknown; started_at: string; completed_at: string }
+    const stops: Array<{ lat: number; lon: number }> =
+      typeof route.stops === 'string' ? JSON.parse(route.stops) : (route.stops as Array<{ lat: number; lon: number }>)
+    if (!Array.isArray(stops) || stops.length < 2) return
+
+    const startedAt = new Date(route.started_at)
+    const totalMinutes =
+      (new Date(route.completed_at).getTime() - startedAt.getTime()) / 60_000
+    const minutesPerLeg = totalMinutes / (stops.length - 1)
+
+    // Derive hour and day-of-week from route start time for the speed profile cell
+    const hourOfDay = startedAt.getUTCHours()
+    const dayOfWeek = startedAt.getUTCDay()
+
+    for (let i = 0; i < stops.length - 1; i++) {
+      const from = stops[i]
+      const to = stops[i + 1]
+      // Haversine distance in km
+      const R = 6371
+      const lat1Rad = (from.lat * Math.PI) / 180
+      const lat2Rad = (to.lat * Math.PI) / 180
+      const dLat = ((to.lat - from.lat) * Math.PI) / 180
+      const dLon = ((to.lon - from.lon) * Math.PI) / 180
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+      const distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      if (minutesPerLeg <= 0 || distanceKm <= 0) continue
+      const observedSpeedKmh = (distanceKm / minutesPerLeg) * 60
+      await updateSpeedProfile(orgId, hourOfDay, dayOfWeek, observedSpeedKmh)
+    }
+
+    logger.info('Speed profile updated', { shipmentId, orgId })
+  } catch (err) {
+    logger.warn('Speed profile update failed', { shipmentId, error: (err as Error).message })
+  }
+})
