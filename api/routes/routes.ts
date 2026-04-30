@@ -4,6 +4,8 @@ import * as routeService from '../services/route.service'
 import { startWorker } from '../../core/queue/simple-queue'
 import { SolverInput } from '../../engines/route-optimizer/types'
 import { logger } from '../../core/logger/logger'
+import { validateRouteInput } from '../../engines/route-optimizer/validation'
+import { query } from '../../core/db/pool'
 
 const optimizeSchema = v.object({
   warehouseId: v.string().required(),
@@ -18,6 +20,126 @@ const confirmSchema = v.object({
 
 export function routesRouter(): Router {
   const router = new Router()
+
+  // POST / — create a route directly with stops and optional capacity, with hard constraint validation
+  router.post('/', async (req, res) => {
+    const body = req.body as Record<string, unknown>
+
+    if (!Array.isArray(body.stops) || body.stops.length === 0) {
+      res.status(400).fail('VALIDATION_ERROR', 'stops must be a non-empty array', 400)
+      return
+    }
+
+    const stops = body.stops as Array<{ lat: number; lon: number; demandUnits?: number }>
+
+    // Validate each stop has lat/lon
+    for (const stop of stops) {
+      if (typeof stop.lat !== 'number' || typeof stop.lon !== 'number') {
+        res.status(400).fail('VALIDATION_ERROR', 'Each stop must have numeric lat and lon', 400)
+        return
+      }
+    }
+
+    const vehicleCapacityUnits = body.vehicleCapacityUnits !== undefined
+      ? (body.vehicleCapacityUnits as number)
+      : undefined
+
+    const validation = validateRouteInput({
+      stops,
+      vehicleCapacityUnits,
+      maxStops: 100,
+    })
+
+    const overrideReason = typeof body.overrideReason === 'string' ? body.overrideReason : undefined
+
+    // Hard failures — block dispatch unless operator provides an override reason
+    if (!validation.isValid) {
+      if (!overrideReason) {
+        res.status(422).fail(
+          'ROUTE_INFEASIBLE',
+          validation.criticalViolations[0].details,
+          422
+        )
+        return
+      }
+
+      // Operator override path: allow through but log the override
+      const orgId = req.orgId!
+
+      try {
+        const route = await routeService.createRoute(orgId, { stops, vehicleCapacityUnits })
+
+        // Log each critical violation that was bypassed
+        for (const violation of validation.criticalViolations) {
+          await query(
+            `INSERT INTO route_overrides
+              (route_id, org_id, override_type, constraint_violated, operator_reason, operator_user_id)
+             VALUES ($1, $2, 'constraint_bypass', $3, $4, $5)`,
+            [
+              route.id,
+              orgId,
+              violation.constraint,
+              overrideReason,
+              req.userId ?? null,
+            ]
+          )
+        }
+
+        logger.warn('Route dispatched with constraint override', {
+          orgId,
+          routeId: route.id,
+          violations: validation.criticalViolations.map(v => v.constraint),
+          overrideReason,
+        })
+
+        res.status(201).ok({
+          route,
+          validationWarnings: [
+            {
+              constraint: 'operator_override',
+              details: 'Route dispatched with constraint override. Reason logged.',
+              suggestedFix: undefined,
+            },
+            ...validation.warnings.map(w => ({
+              constraint: w.constraint,
+              details: w.details,
+              suggestedFix: w.suggestedFix,
+            })),
+          ],
+        })
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; code?: string; message?: string }
+        if (e.statusCode) {
+          res.status(e.statusCode).fail(e.code ?? 'ERROR', e.message ?? 'Error', e.statusCode)
+          return
+        }
+        throw err
+      }
+      return
+    }
+
+    // Happy path — no critical violations
+    try {
+      const orgId = req.orgId!
+      const route = await routeService.createRoute(orgId, { stops, vehicleCapacityUnits })
+
+      res.status(201).ok({
+        route,
+        validationWarnings: validation.warnings.map(w => ({
+          constraint: w.constraint,
+          details: w.details,
+          suggestedFix: w.suggestedFix,
+        })),
+      })
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; code?: string; message?: string }
+      if (e.statusCode) {
+        res.status(e.statusCode).fail(e.code ?? 'ERROR', e.message ?? 'Error', e.statusCode)
+        return
+      }
+      throw err
+    }
+  })
 
   // POST /optimize
   router.post('/optimize', async (req, res) => {

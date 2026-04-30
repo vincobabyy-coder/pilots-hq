@@ -51,6 +51,28 @@ function makeError(message: string, code: string, statusCode: number): Error {
 // Public service functions
 // ---------------------------------------------------------------------------
 
+export interface CreateRouteInput {
+  stops: Array<{ lat: number; lon: number; demandUnits?: number }>
+  vehicleCapacityUnits?: number
+}
+
+/**
+ * Create a route directly from a stops array (no VRP solver).
+ * Used by the POST / handler after validation passes (or is overridden).
+ */
+export async function createRoute(orgId: string, input: CreateRouteInput): Promise<RouteRow> {
+  const routeNumber = 'ROUTE-' + Date.now()
+  const today = new Date().toISOString().slice(0, 10)
+
+  const rows = await query<RouteRow>(
+    `INSERT INTO routes (org_id, route_number, date, stops, status)
+     VALUES ($1, $2, $3, $4::jsonb, 'planned')
+     RETURNING *`,
+    [orgId, routeNumber, today, JSON.stringify(input.stops)]
+  )
+  return rows[0]
+}
+
 export async function optimizeRoutes(orgId: string, req: OptimizeRequest): Promise<string> {
   const { warehouseId, date, vehicleIds, orderIds } = req
 

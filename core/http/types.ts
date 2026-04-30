@@ -1,3 +1,5 @@
+import { ActionableError } from './errors'
+
 export interface PilotsRequest {
   method: string
   url: string
@@ -18,6 +20,8 @@ export interface PilotsResponse {
   json(data: unknown): void
   ok(data: unknown, meta?: Record<string, unknown>): void
   fail(code: string, message: string, httpStatus?: number, fields?: Array<{field: string; message: string}>): void
+  /** Formats and sends an ActionableError. Does not replace .fail() — existing routes are unaffected. */
+  respondError(error: ActionableError): void
   end(): void
 }
 

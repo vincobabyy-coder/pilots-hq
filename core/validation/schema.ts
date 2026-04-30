@@ -1,7 +1,13 @@
+import { FieldError as ActionableFieldError, ActionableError, Errors } from '../http/errors'
+
 export type FieldError = { field: string; message: string }
 export type ValidationResult<T> =
   | { ok: true; data: T }
   | { ok: false; errors: FieldError[] }
+
+export type DetailedValidationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; actionableError: ActionableError }
 
 class StringValidator {
   private _required = false
@@ -90,6 +96,28 @@ class ObjectValidator {
   parse(input: unknown): ValidationResult<Record<string, unknown>> {
     const errors = this.validate(input, 'root')
     if (errors.length > 0) return { ok: false, errors }
+    return { ok: true, data: input as Record<string, unknown> }
+  }
+
+  parseWithDetails(input: unknown): DetailedValidationResult<Record<string, unknown>> {
+    const rawErrors = this.validate(input, 'root')
+    if (rawErrors.length > 0) {
+      // Map the basic FieldError shape to ActionableFieldError with constraint + suggestedFix
+      const actionableFields: ActionableFieldError[] = rawErrors.map(e => ({
+        name: e.field,
+        // Preserve the actual value sent, falling back to undefined if input is not an object
+        value: (
+          input !== null &&
+          typeof input === 'object' &&
+          !Array.isArray(input)
+        )
+          ? (input as Record<string, unknown>)[e.field]
+          : undefined,
+        constraint: e.message,
+        suggestedFix: `Correct the value for "${e.field}" so that: ${e.message}.`,
+      }))
+      return { ok: false, actionableError: Errors.validation(actionableFields) }
+    }
     return { ok: true, data: input as Record<string, unknown> }
   }
 }

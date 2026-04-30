@@ -1,5 +1,11 @@
 import { Pool, PoolClient, QueryResult } from 'pg'
 import { logger } from '../logger/logger'
+import {
+  recordQuerySnapshot,
+  normalizeQuery,
+  fingerprintQuery,
+  SLOW_THRESHOLD_MS,
+} from './query-metrics'
 
 let pool: Pool | null = null
 
@@ -22,7 +28,30 @@ export async function query<T extends Record<string, unknown>>(
   sql: string,
   params: unknown[] = []
 ): Promise<T[]> {
+  const start = Date.now()
   const result: QueryResult<T> = await getPool().query(sql, params)
+  const executionMs = Date.now() - start
+
+  const template = normalizeQuery(sql)
+  const isSlow = executionMs > SLOW_THRESHOLD_MS
+
+  recordQuerySnapshot({
+    fingerprint: fingerprintQuery(template),
+    template,
+    executionMs,
+    rowsReturned: result.rows.length,
+    recordedAt: new Date(),
+    isSlow,
+  })
+
+  if (isSlow) {
+    logger.warn('Slow query detected', {
+      executionMs,
+      template,
+      rowsReturned: result.rows.length,
+    })
+  }
+
   return result.rows
 }
 
