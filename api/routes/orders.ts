@@ -1,5 +1,6 @@
 import { Router } from '../../core/http/router'
 import * as orderService from '../services/order.service'
+import { AllocationOrder } from '../../engines/allocation/bipartite-graph'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -137,11 +138,60 @@ export function ordersRouter(): Router {
     }
 
     try {
-      const order = await orderService.reallocateOrder(req.orgId!, id)
+      const result = await orderService.reallocateOrder(req.orgId!, id)
+      if (!result) {
+        res.status(404).fail('ORDER_NOT_FOUND', 'Order not found', 404); return
+      }
+      const { order, decision } = result
+      res.ok({
+        orderId: order.id as string,
+        allocatedWarehouseId: order.allocated_warehouse_id as string | null,
+        decision,
+      })
+    } catch (err) {
+      void err
+      res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
+    }
+  })
+
+  // POST /what-if-allocate — re-run allocation excluding specific warehouses
+  router.post('/what-if-allocate', async (req, res) => {
+    const body = req.body as Record<string, unknown>
+
+    if (!body.orderId || typeof body.orderId !== 'string') {
+      res.status(400).fail('VALIDATION_ERROR', 'orderId is required and must be a string', 400); return
+    }
+    if (!UUID_RE.test(body.orderId)) {
+      res.status(400).fail('VALIDATION_ERROR', 'orderId must be a valid UUID', 400); return
+    }
+    if (!Array.isArray(body.excludeWarehouseIds)) {
+      res.status(400).fail('VALIDATION_ERROR', 'excludeWarehouseIds must be an array', 400); return
+    }
+
+    const excludeWarehouseIds = body.excludeWarehouseIds as string[]
+
+    try {
+      const order = await orderService.getOrder(req.orgId!, body.orderId)
       if (!order) {
         res.status(404).fail('ORDER_NOT_FOUND', 'Order not found', 404); return
       }
-      res.ok({ order })
+
+      const warehouses = await orderService.getWarehousesForOrg(req.orgId!)
+
+      const allocationOrder: AllocationOrder = {
+        id: order.id as string,
+        lat: order.dest_lat as number,
+        lon: order.dest_lon as number,
+        weightKg: order.total_weight_kg as number | undefined,
+      }
+
+      const result = orderService.whatIfExclude(allocationOrder, warehouses, excludeWarehouseIds)
+
+      if (result.assignedWarehouseId === null) {
+        res.status(422).fail('NO_WAREHOUSES_AVAILABLE', 'No warehouses available after exclusion', 422); return
+      }
+
+      res.ok({ result })
     } catch (err) {
       void err
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)

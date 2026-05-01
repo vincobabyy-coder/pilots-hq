@@ -1,8 +1,11 @@
 import { query, queryOne } from '../../core/db/pool'
 import { logger } from '../../core/logger/logger'
-import { allocate } from '../../engines/allocation/hungarian'
-import { AllocationOrder, AllocationWarehouse } from '../../engines/allocation/bipartite-graph'
+import { AllocationOrder, AllocationWarehouse, buildCostMatrix } from '../../engines/allocation/bipartite-graph'
+import { hungarian } from '../../engines/allocation/hungarian'
+import { explainAllocation, whatIfExclude, AllocationDecision } from '../../engines/allocation/decision'
 import { eventBus } from '../../core/events/event-bus'
+
+export { AllocationDecision }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -56,7 +59,10 @@ export async function createOrder(orgId: string, input: CreateOrderInput): Promi
   return order
 }
 
-async function runAllocation(orgId: string, order: Record<string, unknown>): Promise<void> {
+async function runAllocation(
+  orgId: string,
+  order: Record<string, unknown>
+): Promise<AllocationDecision | null> {
   // Fetch warehouses for this org — always scoped to org_id
   const whRows = await query<Record<string, unknown>>(
     `SELECT w.id, w.lat, w.lon, w.capacity_units, w.current_units,
@@ -68,7 +74,7 @@ async function runAllocation(orgId: string, order: Record<string, unknown>): Pro
     [orgId]
   )
 
-  if (whRows.length === 0) return
+  if (whRows.length === 0) return null
 
   const allocationOrder: AllocationOrder = {
     id: order.id as string,
@@ -93,9 +99,14 @@ async function runAllocation(orgId: string, order: Record<string, unknown>): Pro
     }
   })
 
-  const assignment = allocate([allocationOrder], allocationWarehouses)
-  const warehouseId = assignment.get(order.id as string)
-  if (!warehouseId) return
+  // Build cost matrix manually so we can pass it to explainAllocation
+  const costMatrix = buildCostMatrix([allocationOrder], allocationWarehouses)
+  const assignment = hungarian(costMatrix)
+  const whIndex = assignment[0]
+
+  if (whIndex < 0 || whIndex >= allocationWarehouses.length) return null
+
+  const warehouseId = allocationWarehouses[whIndex].id
 
   await query(
     `UPDATE orders SET allocated_warehouse_id = $1, status = 'allocated', updated_at = NOW()
@@ -111,6 +122,8 @@ async function runAllocation(orgId: string, order: Record<string, unknown>): Pro
   })
 
   logger.info('Order allocated', { orderId: order.id, warehouseId, orgId })
+
+  return explainAllocation(allocationOrder, allocationWarehouses, whIndex, costMatrix)
 }
 
 export async function listOrders(
@@ -156,7 +169,10 @@ export async function getOrder(orgId: string, orderId: string): Promise<Record<s
   )
 }
 
-export async function reallocateOrder(orgId: string, orderId: string): Promise<Record<string, unknown> | null> {
+export async function reallocateOrder(
+  orgId: string,
+  orderId: string
+): Promise<{ order: Record<string, unknown>; decision: AllocationDecision | null } | null> {
   if (!UUID_RE.test(orderId)) return null
 
   const order = await queryOne<Record<string, unknown>>(
@@ -165,6 +181,38 @@ export async function reallocateOrder(orgId: string, orderId: string): Promise<R
   )
   if (!order) return null
 
-  await runAllocation(orgId, order)
-  return getOrder(orgId, orderId)
+  const decision = await runAllocation(orgId, order)
+  const updatedOrder = await getOrder(orgId, orderId)
+  if (!updatedOrder) return null
+  return { order: updatedOrder, decision }
 }
+
+// Fetch all warehouses for an org — used by what-if allocation route
+export async function getWarehousesForOrg(orgId: string): Promise<AllocationWarehouse[]> {
+  const whRows = await query<Record<string, unknown>>(
+    `SELECT w.id, w.lat, w.lon, w.capacity_units, w.current_units,
+            COALESCE(json_agg(json_build_object('sku', i.sku, 'quantity', i.quantity, 'reservedQuantity', i.reserved_quantity)) FILTER (WHERE i.sku IS NOT NULL), '[]') AS inventory
+     FROM warehouses w
+     LEFT JOIN warehouse_inventory i ON i.warehouse_id = w.id
+     WHERE w.org_id = $1
+     GROUP BY w.id`,
+    [orgId]
+  )
+  return whRows.map(row => {
+    const inv = new Map<string, { quantity: number; reservedQuantity: number }>()
+    for (const item of row.inventory as Array<{ sku: string; quantity: number; reservedQuantity: number }>) {
+      inv.set(item.sku, { quantity: item.quantity, reservedQuantity: item.reservedQuantity })
+    }
+    return {
+      id: row.id as string,
+      lat: parseFloat(row.lat as string),
+      lon: parseFloat(row.lon as string),
+      capacityUnits: row.capacity_units as number,
+      currentUnits: row.current_units as number,
+      inventory: inv,
+    }
+  })
+}
+
+// Re-export what-if function so the route doesn't need to import from engines directly
+export { whatIfExclude }

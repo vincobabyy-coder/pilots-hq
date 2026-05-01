@@ -26,6 +26,8 @@ function makeLocationEvent(lat: number, lon: number, createdAt: Date): TrackingE
 }
 
 describe('exception detector', () => {
+  // ── Backward-compat: original tests ─────────────────────────────────────
+
   it('no exceptions on fresh in-transit shipment', () => {
     const state = makeState({ lastUpdatedAt: new Date() })
     const result = detectExceptions(state, [], new Date())
@@ -38,7 +40,6 @@ describe('exception detector', () => {
     const state = makeState({ status: 'in_transit', lastUpdatedAt: threeHoursAgo })
     const result = detectExceptions(state, [], new Date())
     expect(result.isException).toBe(true)
-    // At least one reason mentions overdue
     const hasOverdue = result.reasons.some(r => r.toLowerCase().includes('overdue'))
     expect(hasOverdue).toBeTruthy()
   })
@@ -52,7 +53,6 @@ describe('exception detector', () => {
 
   it('stale: flags when last location_updated > 45 minutes ago', () => {
     const fiftyMinutesAgo = new Date(Date.now() - 50 * 60 * 1000)
-    // State updated recently so overdue doesn't fire
     const state = makeState({ lastUpdatedAt: new Date() })
     const events: TrackingEvent[] = [makeLocationEvent(6.5, 3.3, fiftyMinutesAgo)]
     const result = detectExceptions(state, events, new Date())
@@ -89,7 +89,7 @@ describe('exception detector', () => {
   it('location anomaly: no flag for reasonable movement', () => {
     const t0 = new Date(Date.now() - 3 * 60 * 1000) // 3 minutes ago
     const t1 = new Date(Date.now() - 1 * 60 * 1000) // 1 minute ago
-    // ~1 km apart (roughly 0.009 degrees latitude)
+    // ~1 km apart
     const events: TrackingEvent[] = [
       makeLocationEvent(6.5244, 3.3792, t0),
       makeLocationEvent(6.5334, 3.3792, t1),
@@ -100,5 +100,98 @@ describe('exception detector', () => {
       r => r.toLowerCase().includes('anomaly') || r.toLowerCase().includes('jump')
     )
     expect(hasAnomaly).toBeFalsy()
+  })
+
+  // ── Phase 2.1: new structured-exception tests ────────────────────────────
+
+  it('no exceptions → items is empty, highestSeverity is 0', () => {
+    const state = makeState({ lastUpdatedAt: new Date() })
+    const result = detectExceptions(state, [], new Date())
+    expect(result.isException).toBe(false)
+    expect(result.items).toHaveLength(0)
+    expect(result.highestSeverity).toBe(0)
+  })
+
+  it('overdue → severity 3, has rootCausehypothesis and recommendedAction', () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000)
+    const state = makeState({ status: 'in_transit', lastUpdatedAt: threeHoursAgo })
+    const result = detectExceptions(state, [], new Date())
+    // items is non-empty (overdue fires)
+    expect(result.items.length > 0).toBeTruthy()
+    const overdueItem = result.items.find(i => i.reason.toLowerCase().includes('overdue'))
+    expect(overdueItem).toBeTruthy()
+    expect(overdueItem!.severity).toBe(3)
+    // rootCausehypothesis is a non-empty string
+    expect(overdueItem!.rootCausehypothesis).toBeTruthy()
+    // recommendedAction is a non-empty string
+    expect(overdueItem!.recommendedAction).toBeTruthy()
+  })
+
+  it('stale location → severity 2, correct rootCause and recommendedAction', () => {
+    const fiftyMinutesAgo = new Date(Date.now() - 50 * 60 * 1000)
+    const state = makeState({ lastUpdatedAt: new Date() })
+    const events: TrackingEvent[] = [makeLocationEvent(6.5, 3.3, fiftyMinutesAgo)]
+    const result = detectExceptions(state, events, new Date())
+    const staleItem = result.items.find(i => i.reason.includes('45'))
+    expect(staleItem).toBeTruthy()
+    expect(staleItem!.severity).toBe(2)
+    // rootCause mentions GPS connectivity
+    const rootCauseLower = staleItem!.rootCausehypothesis.toLowerCase()
+    expect(rootCauseLower.includes('gps')).toBeTruthy()
+    // recommendedAction mentions contacting driver
+    const actionLower = staleItem!.recommendedAction.toLowerCase()
+    expect(actionLower.includes('driver')).toBeTruthy()
+  })
+
+  it('location jump → severity 3, rootCause mentions GPS spoofing', () => {
+    const t0 = new Date(Date.now() - 6 * 60 * 1000)
+    const t1 = new Date(Date.now() - 1 * 60 * 1000)
+    const events: TrackingEvent[] = [
+      makeLocationEvent(51.5074, -0.1278, t0), // London
+      makeLocationEvent(48.8566, 2.3522, t1),  // Paris
+    ]
+    const state = makeState({ lastUpdatedAt: t1 })
+    const result = detectExceptions(state, events, new Date())
+    const jumpItem = result.items.find(
+      i => i.reason.toLowerCase().includes('anomaly') || i.reason.toLowerCase().includes('jump')
+    )
+    expect(jumpItem).toBeTruthy()
+    expect(jumpItem!.severity).toBe(3)
+    const rootCauseLower = jumpItem!.rootCausehypothesis.toLowerCase()
+    expect(rootCauseLower.includes('gps spoofing')).toBeTruthy()
+  })
+
+  it('multiple exceptions → highestSeverity equals max of all severities', () => {
+    // Trigger both overdue (sev 3) and stale location (sev 2) simultaneously.
+    // State updated 3 hours ago → overdue fires.
+    // Location event 50 minutes ago → stale fires.
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000)
+    const fiftyMinutesAgo = new Date(Date.now() - 50 * 60 * 1000)
+    const state = makeState({ status: 'in_transit', lastUpdatedAt: threeHoursAgo })
+    const events: TrackingEvent[] = [makeLocationEvent(6.5, 3.3, fiftyMinutesAgo)]
+    const result = detectExceptions(state, events, new Date())
+    // Both overdue and stale should fire → at least 2 items
+    expect(result.items.length >= 2).toBeTruthy()
+    // highestSeverity must equal the maximum severity across all items
+    const computedMax = result.items.reduce((m, i) => (i.severity > m ? i.severity : m), 0)
+    expect(result.highestSeverity).toBe(computedMax)
+    // overdue is sev 3, so highest must be 3
+    expect(result.highestSeverity).toBe(3)
+  })
+
+  it('reasons[] is always in sync with items.map(i => i.reason)', () => {
+    // Test with overdue scenario so we have at least one item.
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000)
+    const state = makeState({ status: 'in_transit', lastUpdatedAt: threeHoursAgo })
+    const result = detectExceptions(state, [], new Date())
+    const derivedReasons = result.items.map(i => i.reason)
+    expect(result.reasons).toEqual(derivedReasons)
+  })
+
+  it('reasons[] is in sync with items when there are no exceptions', () => {
+    const state = makeState({ lastUpdatedAt: new Date() })
+    const result = detectExceptions(state, [], new Date())
+    expect(result.reasons).toEqual(result.items.map(i => i.reason))
+    expect(result.reasons).toHaveLength(0)
   })
 })

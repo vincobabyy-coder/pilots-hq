@@ -78,3 +78,86 @@ describe('forecastDemand — negative clamp', () => {
     })
   })
 })
+
+describe('forecastDemand — new fields (Phase 2.2)', () => {
+  it('result has all new fields: coldStart, decomposition, confidenceBands', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+
+    // Verify fields exist by checking their types / truthiness
+    expect(typeof result.coldStart).toBe('boolean')
+    expect(typeof result.decomposition).toBe('object')
+    expect(typeof result.confidenceBands).toBe('object')
+    expect(Array.isArray(result.confidenceBands.p25)).toBe(true)
+    expect(Array.isArray(result.confidenceBands.p75)).toBe(true)
+    expect(Array.isArray(result.confidenceBands.p10)).toBe(true)
+    expect(Array.isArray(result.confidenceBands.p90)).toBe(true)
+  })
+
+  it('coldStart is true when data.length < periodLength * 3', () => {
+    // period=4, need <12 points but >= 8; use exactly 8
+    const data = makeLinearSeasonal(8, 4)
+    const result = forecastDemand(data, 4, 2)
+    expect(result.coldStart).toBe(true)
+  })
+
+  it('coldStart is false when data.length >= periodLength * 3', () => {
+    // period=4, need >= 12 points; use 16
+    const data = makeLinearSeasonal(16, 4)
+    const result = forecastDemand(data, 4, 2)
+    expect(result.coldStart).toBe(false)
+  })
+
+  it('p90 >= p75 >= forecastedValue >= p25 >= p10 for all horizon steps', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+    const { p10, p25, p75, p90 } = result.confidenceBands
+
+    for (let i = 0; i < 4; i++) {
+      expect(p90[i] >= p75[i]).toBe(true)
+      expect(p75[i] >= result.forecastedValues[i]).toBe(true)
+      expect(result.forecastedValues[i] >= p25[i]).toBe(true)
+      expect(p25[i] >= p10[i]).toBe(true)
+    }
+  })
+
+  it('byPeriod.length === periodLength', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+    expect(result.decomposition.byPeriod).toHaveLength(4)
+  })
+
+  it('decomposition.trendSlopePerStep is a finite number', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+    const slope = result.decomposition.trendSlopePerStep
+    expect(typeof slope).toBe('number')
+    expect(isFinite(slope)).toBe(true)
+  })
+
+  it('decomposition.seasonalityStrength is in [0, 1]', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+    const strength = result.decomposition.seasonalityStrength
+    expect(strength >= 0).toBe(true)
+    expect(strength <= 1).toBe(true)
+  })
+
+  it('p10 equals confidenceLow and p90 equals confidenceHigh', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+    for (let i = 0; i < 4; i++) {
+      expect(result.confidenceBands.p10[i]).toBe(result.confidenceLow[i])
+      expect(result.confidenceBands.p90[i]).toBe(result.confidenceHigh[i])
+    }
+  })
+
+  it('byPeriod entries have correct shape', () => {
+    const data = makeLinearSeasonal(24, 4)
+    const result = forecastDemand(data, 4, 4)
+    result.decomposition.byPeriod.forEach((entry, idx) => {
+      expect(entry.periodIndex).toBe(idx)
+      expect(typeof entry.adjustment).toBe('number')
+    })
+  })
+})

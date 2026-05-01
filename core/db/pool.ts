@@ -35,11 +35,14 @@ export async function query<T extends Record<string, unknown>>(
   const template = normalizeQuery(sql)
   const isSlow = executionMs > SLOW_THRESHOLD_MS
 
+  // DDL statements (CREATE TABLE, CREATE INDEX) return result.rows = undefined
+  const rows: T[] = result.rows ?? []
+
   recordQuerySnapshot({
     fingerprint: fingerprintQuery(template),
     template,
     executionMs,
-    rowsReturned: result.rows.length,
+    rowsReturned: rows.length,
     recordedAt: new Date(),
     isSlow,
   })
@@ -48,11 +51,11 @@ export async function query<T extends Record<string, unknown>>(
     logger.warn('Slow query detected', {
       executionMs,
       template,
-      rowsReturned: result.rows.length,
+      rowsReturned: rows.length,
     })
   }
 
-  return result.rows
+  return rows
 }
 
 export async function queryOne<T extends Record<string, unknown>>(
