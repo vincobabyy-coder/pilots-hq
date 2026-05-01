@@ -174,6 +174,7 @@ export function branchAndBound(
 
   let bestCost = initialSolution.totalDistanceKm
   let bestRoutes = initialSolution.routes
+  let nodesExplored = 0
 
   // Build the initial BnB state from EMPTY routes (we let B&B reconstruct
   // from scratch so it can explore orderings the greedy pass missed).
@@ -193,6 +194,7 @@ export function branchAndBound(
     if (Date.now() - startTime >= timeLimitMs) break
 
     const state = stack.pop()!
+    nodesExplored++
 
     // --- Terminal node ---
     if (state.unserved.length === 0) {
@@ -324,5 +326,6 @@ export function branchAndBound(
     routes: bestRoutes,
     totalDistanceKm: bestCost,
     solveTimeMs: Date.now() - startTime,
+    nodesExplored,
   }
 }

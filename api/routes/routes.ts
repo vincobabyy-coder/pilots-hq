@@ -6,6 +6,34 @@ import { SolverInput } from '../../engines/route-optimizer/types'
 import { logger } from '../../core/logger/logger'
 import { validateRouteInput } from '../../engines/route-optimizer/validation'
 import { query } from '../../core/db/pool'
+import { solveVRP, SolverMetadata } from '../../engines/route-optimizer/vrp'
+
+// ---------------------------------------------------------------------------
+// Helper: run the VRP solver on POST / stops to get solver metadata.
+// Wraps the raw stop array in a minimal SolverInput with one synthetic vehicle.
+// ---------------------------------------------------------------------------
+async function getSolverMetadata(
+  stops: Array<{ lat: number; lon: number; demandUnits?: number }>,
+  vehicleCapacityUnits?: number
+): Promise<SolverMetadata> {
+  const capacityKg = vehicleCapacityUnits ?? 1e9
+  const solverInput: SolverInput = {
+    orgId: 'api',
+    warehouseLat: 0,
+    warehouseLon: 0,
+    vehicles: [{ id: 'v0', capacityKg, capacityCbm: 1e9 }],
+    stops: stops.map((s, i) => ({
+      orderId: `stop-${i}`,
+      lat: s.lat,
+      lon: s.lon,
+      weightKg: s.demandUnits ?? 1,
+      volumeCbm: 0.01,
+    })),
+    date: new Date(),
+  }
+  const result = await solveVRP(solverInput)
+  return result.solver
+}
 
 const optimizeSchema = v.object({
   warehouseId: v.string().required(),
@@ -92,8 +120,11 @@ export function routesRouter(): Router {
           overrideReason,
         })
 
+        const solver = await getSolverMetadata(stops, vehicleCapacityUnits)
+
         res.status(201).ok({
           route,
+          solver,
           validationWarnings: [
             {
               constraint: 'operator_override',
@@ -122,9 +153,11 @@ export function routesRouter(): Router {
     try {
       const orgId = req.orgId!
       const route = await routeService.createRoute(orgId, { stops, vehicleCapacityUnits })
+      const solver = await getSolverMetadata(stops, vehicleCapacityUnits)
 
       res.status(201).ok({
         route,
+        solver,
         validationWarnings: validation.warnings.map(w => ({
           constraint: w.constraint,
           details: w.details,

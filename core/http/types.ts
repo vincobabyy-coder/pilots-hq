@@ -15,6 +15,8 @@ export interface PilotsRequest {
 }
 
 export interface PilotsResponse {
+  /** The HTTP status code that will be / was sent. Defaults to 200. */
+  statusCode: number
   status(code: number): PilotsResponse
   setHeader(name: string, value: string): PilotsResponse
   json(data: unknown): void

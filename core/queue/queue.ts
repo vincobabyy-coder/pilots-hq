@@ -13,10 +13,20 @@ export interface JobOptions {
   timeoutMs?: number       // default: 30_000, range 1000–300_000
 }
 
+export interface JobAttemptRecord {
+  attemptNumber: number    // 1-based
+  startedAt:     string   // ISO-8601
+  completedAt:   string   // ISO-8601
+  result:        'success' | 'failure' | 'timeout'
+  errorMessage?: string
+  durationMs:    number
+}
+
 export interface FullJob<T = unknown> {
   id: string
   queue: string
   payload: T
+  inputSnapshot: unknown   // original payload at enqueue time (immutable copy)
   status: JobStatus
   priority: JobPriority
   attempts: number         // how many times this job has been attempted
@@ -24,6 +34,7 @@ export interface FullJob<T = unknown> {
   timeoutMs: number
   result?: unknown
   error?: string
+  executionTrace: JobAttemptRecord[]  // appended after each attempt
   createdAt: string
   updatedAt: string
 }
@@ -77,6 +88,7 @@ async function saveFullJob(r: Redis, job: FullJob): Promise<void> {
       id: job.id,
       queue: job.queue,
       payload: JSON.stringify(job.payload),
+      inputSnapshot: JSON.stringify(job.inputSnapshot),
       status: job.status,
       priority: job.priority,
       attempts: String(job.attempts),
@@ -84,6 +96,7 @@ async function saveFullJob(r: Redis, job: FullJob): Promise<void> {
       timeoutMs: String(job.timeoutMs),
       result: job.result !== undefined ? JSON.stringify(job.result) : '',
       error: job.error ?? '',
+      executionTrace: JSON.stringify(job.executionTrace),
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     })
@@ -117,8 +130,11 @@ export async function enqueueFull<T>(
   }
 
   const job: FullJob<T> = {
-    id, queue: queueName, payload, status: 'pending',
+    id, queue: queueName, payload,
+    inputSnapshot: JSON.parse(serialized) as unknown,  // deep-copy of payload at enqueue time
+    status: 'pending',
     priority, attempts: 0, maxRetries, timeoutMs,
+    executionTrace: [],
     createdAt: now, updatedAt: now,
   }
 
@@ -137,11 +153,13 @@ export async function getFullJob(jobId: string): Promise<FullJob | null> {
     id: raw['id'] ?? jobId,
     queue: raw['queue'] ?? '',
     payload: raw['payload'] ? JSON.parse(raw['payload']) : null,
+    inputSnapshot: raw['inputSnapshot'] ? JSON.parse(raw['inputSnapshot']) : null,
     status: (raw['status'] ?? 'pending') as JobStatus,
     priority: (raw['priority'] ?? 'normal') as JobPriority,
     attempts: parseInt(raw['attempts'] ?? '0', 10),
     maxRetries: parseInt(raw['maxRetries'] ?? '3', 10),
     timeoutMs: parseInt(raw['timeoutMs'] ?? '30000', 10),
+    executionTrace: raw['executionTrace'] ? (JSON.parse(raw['executionTrace']) as JobAttemptRecord[]) : [],
     createdAt: raw['createdAt'] ?? '',
     updatedAt: raw['updatedAt'] ?? '',
   }
@@ -187,4 +205,45 @@ export async function getDlqJobs(queueName: string, limit = 50): Promise<FullJob
   const ids = await r.lrange(dlqKey(queueName), -limit, -1)
   const jobs = await Promise.all(ids.map(id => getFullJob(id)))
   return jobs.filter((j): j is FullJob => j !== null)
+}
+
+// Takes a job from the DLQ, resets attempts to 0, clears executionTrace,
+// and re-enqueues it in the normal priority queue.
+// Returns the NEW job ID (same payload, fresh state).
+export async function replayDlqJob(jobId: string, queueName: string): Promise<string> {
+  const r = getRedis()
+  const original = await getFullJob(jobId)
+  if (!original) {
+    throw new Error(`Job "${jobId}" not found — cannot replay`)
+  }
+
+  const now = new Date().toISOString()
+  const newId = randomUUID()
+
+  // Build a fresh job from the original's inputSnapshot so the payload is
+  // exactly what was submitted at enqueue time (not a potentially mutated value).
+  const freshJob: FullJob = {
+    ...original,
+    id: newId,
+    status: 'pending',
+    attempts: 0,
+    executionTrace: [],
+    result: undefined,
+    error: undefined,
+    createdAt: now,
+    updatedAt: now,
+    // Restore payload from the immutable snapshot
+    payload: original.inputSnapshot,
+  }
+
+  await saveFullJob(r, freshJob)
+  await r.rpush(listKey(queueName, freshJob.priority), newId)
+  logger.info('DLQ job replayed', { originalJobId: jobId, newJobId: newId, queue: queueName })
+  return newId
+}
+
+// Returns the executionTrace for a job, or an empty array if not found.
+export async function getJobTrace(jobId: string): Promise<JobAttemptRecord[]> {
+  const job = await getFullJob(jobId)
+  return job?.executionTrace ?? []
 }

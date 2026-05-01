@@ -1,8 +1,11 @@
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface LogContext {
-  requestId?: string
-  orgId?: string
+  requestId?:  string
+  orgId?:      string
+  userId?:     string
+  shipmentId?: string
+  routeId?:    string
   [key: string]: unknown
 }
 
@@ -31,4 +34,18 @@ export const logger = {
   info:  (msg: string, ctx?: LogContext) => log('info',  msg, ctx),
   warn:  (msg: string, ctx?: LogContext) => log('warn',  msg, ctx),
   error: (msg: string, ctx?: LogContext) => log('error', msg, ctx),
+}
+
+/**
+ * Returns a child logger that merges `context` into every log call.
+ * Use this inside route handlers / services so every entry automatically
+ * carries requestId, orgId, userId, etc. without repeating them.
+ */
+export function createContextLogger(context: LogContext): typeof logger {
+  return {
+    debug: (msg: string, ctx?: LogContext) => log('debug', msg, { ...context, ...ctx }),
+    info:  (msg: string, ctx?: LogContext) => log('info',  msg, { ...context, ...ctx }),
+    warn:  (msg: string, ctx?: LogContext) => log('warn',  msg, { ...context, ...ctx }),
+    error: (msg: string, ctx?: LogContext) => log('error', msg, { ...context, ...ctx }),
+  }
 }

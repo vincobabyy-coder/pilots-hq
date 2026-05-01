@@ -39,12 +39,8 @@ export const cors = (allowedOrigins: string[] = ['*']): Middleware => async (req
 
 export const requestLogger: Middleware = async (req, res, next) => {
   const start = Date.now()
+  logger.info('Request', { requestId: req.requestId, method: req.method, path: req.path })
   await next()
-  logger.info('request', {
-    requestId: req.requestId,
-    method: req.method,
-    path: req.path,
-    ms: Date.now() - start,
-    orgId: req.orgId,
-  })
+  const durationMs = Date.now() - start
+  logger.info('Request', { requestId: req.requestId, method: req.method, path: req.path, statusCode: res.statusCode ?? 0, durationMs })
 }

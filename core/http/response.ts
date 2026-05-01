@@ -7,6 +7,8 @@ export function buildResponse(raw: ServerResponse, requestId: string): PilotsRes
   let headersSent = false
 
   const res: PilotsResponse = {
+    get statusCode() { return statusCode },
+
     status(code) {
       statusCode = code
       return res

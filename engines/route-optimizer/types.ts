@@ -45,4 +45,6 @@ export interface SolverResult {
   routes: SolverRoute[]
   totalDistanceKm: number
   solveTimeMs: number
+  /** B&B nodes explored; 0 for greedy-only runs. Internal use by vrp.ts. */
+  nodesExplored?: number
 }
