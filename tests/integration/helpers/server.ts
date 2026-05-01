@@ -18,6 +18,8 @@ import { ordersRouter } from '../../../api/routes/orders'
 import { shipmentsRouter } from '../../../api/routes/shipments'
 import { analyticsRouter } from '../../../api/routes/analytics'
 import { fraudRouter } from '../../../api/routes/fraud'
+import { billingRouter } from '../../../api/routes/billing'
+import { jobsRouter } from '../../../api/routes/jobs'
 
 export function loadEnv(): void {
   try {
@@ -61,6 +63,8 @@ export async function startTestServer(): Promise<string> {
   app.mount('/api/v1/shipments', shipmentsRouter())
   app.mount('/api/v1/analytics', analyticsRouter())
   app.mount('/api/v1/fraud', fraudRouter())
+  app.mount('/api/v1/billing', billingRouter())
+  app.mount('/api/v1/jobs', jobsRouter())
 
   const httpServer = app.initHttpServer()
 
