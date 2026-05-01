@@ -18,6 +18,7 @@ export interface TrackingEvent {
   lon?: number
   details?: Record<string, unknown>
   createdAt: Date
+  eventHash?: string   // SHA-256 hash of this event's content + previous event's hash
 }
 
 export interface ShipmentState {

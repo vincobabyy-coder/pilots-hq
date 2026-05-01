@@ -45,14 +45,82 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   'default': { windowMs: 60_000, maxRequests: 100 },
 }
 
+// Per-tier rate limit configurations. Routes not listed fall through to 'default'.
+const TIER_LIMITS: Record<string, Record<string, RateLimitConfig>> = {
+  starter: {
+    'POST /api/v1/auth/login': { windowMs: 60_000, maxRequests: 5 },
+    'POST /api/v1/orders':     { windowMs: 60_000, maxRequests: 10 },
+    'default':                  { windowMs: 60_000, maxRequests: 30 },
+  },
+  growth: {
+    'POST /api/v1/auth/login': { windowMs: 60_000, maxRequests: 10 },
+    'POST /api/v1/orders':     { windowMs: 60_000, maxRequests: 60 },
+    'default':                  { windowMs: 60_000, maxRequests: 120 },
+  },
+  enterprise: {
+    'POST /api/v1/auth/login': { windowMs: 60_000, maxRequests: 20 },
+    'POST /api/v1/orders':     { windowMs: 60_000, maxRequests: 300 },
+    'default':                  { windowMs: 60_000, maxRequests: 600 },
+  },
+}
+
+/**
+ * Decode the `tier` claim from a JWT Authorization header without re-verifying
+ * the signature. Auth middleware upstream has already verified the token; we only
+ * need the tier value here. Returns null if the header is absent or malformed.
+ */
+function extractTierFromAuthHeader(authHeader: string | undefined): string | null {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null
+  const token = authHeader.slice(7)
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    // Restore standard base64 padding before decoding
+    const bodyPart = parts[1]
+    const padded = bodyPart + '==='.slice((bodyPart.length + 3) % 4)
+    const decoded = Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+    const payload = JSON.parse(decoded) as Record<string, unknown>
+    const tier = payload['tier']
+    return typeof tier === 'string' ? tier : null
+  } catch {
+    return null
+  }
+}
+
 export function rateLimiter(config?: RateLimitConfig): Middleware {
   return async (req, res, next) => {
     const rawForwardedFor = req.headers['x-forwarded-for']
     const clientIp = Array.isArray(rawForwardedFor)
       ? rawForwardedFor[0].split(',')[0].trim()
       : rawForwardedFor?.split(',')[0].trim()
-    const key = `rl:${clientIp ?? req.headers['host'] ?? 'unknown'}:${req.method}:${req.path}`
-    const limit = config ?? DEFAULT_LIMITS[`${req.method} ${req.path}`] ?? DEFAULT_LIMITS['default']
+
+    // Determine the effective rate limit.
+    // When config is explicitly passed (e.g. in tests or route-specific overrides), use it
+    // directly and skip tier logic so that callers remain in full control.
+    let limit: RateLimitConfig
+    let keyPrefix = 'rl:'
+
+    if (config !== undefined) {
+      limit = config
+    } else {
+      const routeKey = `${req.method} ${req.path}`
+
+      // Decode tier from the JWT carried in the Authorization header. Auth middleware
+      // has already validated the token upstream; we only base64-decode the payload here.
+      const tier = extractTierFromAuthHeader(req.headers['authorization']) ?? 'starter'
+      const tierLimits = TIER_LIMITS[tier] ?? TIER_LIMITS['starter']
+      const tierLimit = tierLimits[routeKey] ?? tierLimits['default']
+
+      // Enterprise requests with X-Priority: high get their own Redis key bucket with
+      // doubled capacity, keeping them isolated from standard traffic.
+      const isHighPriority = req.headers['x-priority'] === 'high' && tier === 'enterprise'
+      keyPrefix = isHighPriority ? 'rl:hp:' : 'rl:'
+      limit = isHighPriority
+        ? { ...tierLimit, maxRequests: tierLimit.maxRequests * 2 }
+        : tierLimit
+    }
+
+    const key = `${keyPrefix}${clientIp ?? req.headers['host'] ?? 'unknown'}:${req.method}:${req.path}`
 
     try {
       const r = getRedis()

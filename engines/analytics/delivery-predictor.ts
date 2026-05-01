@@ -5,8 +5,16 @@ export interface RouteStop {
   lon: number
 }
 
+export interface ETAConfidenceInterval {
+  p10EtaMinutes: number  // optimistic ETA — 90th-percentile speed (fast traffic)
+  p50EtaMinutes: number  // median ETA
+  p90EtaMinutes: number  // pessimistic ETA — 10th-percentile speed (slow traffic), use for SLA commitments
+  p99EtaMinutes: number  // worst-case ETA — very slow traffic
+}
+
 export interface DeliveryPrediction {
   estimatedMinutes: number
+  eta: ETAConfidenceInterval
   breakdown: Array<{
     fromStop:         number
     toStop:           number
@@ -93,8 +101,19 @@ export async function predictDelivery(
     elapsedMs    += legMinutes * 60_000
   }
 
+  // Derive ETA confidence intervals from the point estimate using a fixed spread.
+  // Higher speed → shorter time, so p10 (optimistic) uses the faster-speed factor
+  // and p90/p99 (pessimistic) use the slower-speed factors.
+  const eta: ETAConfidenceInterval = {
+    p10EtaMinutes: totalMinutes * 0.80,   // +20 % speed → 20 % shorter
+    p50EtaMinutes: totalMinutes,           // median
+    p90EtaMinutes: totalMinutes * 1.30,   // −23 % speed → 30 % longer
+    p99EtaMinutes: totalMinutes * 1.60,   // −37.5 % speed → 60 % longer
+  }
+
   return {
     estimatedMinutes: totalMinutes,
+    eta,
     breakdown,
   }
 }

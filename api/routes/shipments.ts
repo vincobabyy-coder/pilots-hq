@@ -111,6 +111,58 @@ export function shipmentsRouter(): Router {
     }
   })
 
+  // GET /:id/location — polling fallback: most recent location_updated event
+  router.get('/:id/location', async (req, res) => {
+    const shipmentId = req.params.id
+
+    // Validate shipment ID is a valid UUID
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_RE.test(shipmentId)) {
+      res.status(400).fail('VALIDATION_ERROR', 'shipment id must be a valid UUID', 400); return
+    }
+
+    try {
+      // Query most recent location_updated event for this shipment, scoped to the org
+      const rows = await query<{ lat: number | null; lon: number | null; created_at: string }>(
+        `SELECT te.lat, te.lon, te.created_at
+         FROM tracking_events te
+         JOIN shipments s ON s.id = te.shipment_id
+         WHERE te.shipment_id = $1
+           AND s.org_id        = $2
+           AND te.event_type   = 'location_updated'
+         ORDER BY te.created_at DESC
+         LIMIT 1`,
+        [shipmentId, req.orgId!]
+      )
+
+      if (rows.length === 0) {
+        res.ok({
+          data: {
+            shipmentId,
+            lat:            null,
+            lon:            null,
+            updatedAt:      null,
+            connectionHint: 'websocket-preferred',
+          },
+        })
+        return
+      }
+
+      const row = rows[0]
+      res.ok({
+        data: {
+          shipmentId,
+          lat:            row.lat,
+          lon:            row.lon,
+          updatedAt:      row.created_at,
+          connectionHint: 'websocket-preferred',
+        },
+      })
+    } catch (err) {
+      handleServiceError(err, res)
+    }
+  })
+
   // GET /:id/events — event log
   router.get('/:id/events', async (req, res) => {
     try {

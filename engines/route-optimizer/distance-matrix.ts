@@ -8,6 +8,52 @@ export interface SpeedProfile {
   sampleCount: number
 }
 
+export interface SpeedConfidenceInterval {
+  p50SpeedKmh: number  // median speed
+  p90SpeedKmh: number  // 90th percentile speed (faster = shorter ETA)
+  p99SpeedKmh: number  // 99th percentile speed
+  p10SpeedKmh: number  // 10th percentile speed (slower = longer ETA)
+  sampleCount: number  // how many observations
+}
+
+/**
+ * Returns speed confidence intervals for a given (orgId, hour, dayOfWeek) bucket.
+ * Looks up the stored mean speed from the DB and derives P10/P50/P90/P99 using
+ * a conservative ±% spread (no variance stored yet):
+ *   p10 = μ × 0.75  (heavy traffic — 25 % slower)
+ *   p50 = μ         (median)
+ *   p90 = μ × 1.15  (light traffic — 15 % faster)
+ *   p99 = μ × 1.25  (very light traffic — 25 % faster)
+ * Falls back to 40 km/h when no profile row exists.
+ */
+export async function getSpeedConfidenceInterval(
+  orgId: string,
+  hour: number,
+  dayOfWeek: number
+): Promise<SpeedConfidenceInterval> {
+  if (hour < 0 || hour > 23) throw new RangeError(`hour must be 0–23, got ${hour}`)
+  if (dayOfWeek < 0 || dayOfWeek > 6) throw new RangeError(`dayOfWeek must be 0–6, got ${dayOfWeek}`)
+
+  const profile = await queryOne<{
+    avg_speed_kmh: number
+    sample_count: number
+  }>(
+    'SELECT avg_speed_kmh, sample_count FROM speed_profiles WHERE org_id = $1 AND hour_of_day = $2 AND day_of_week = $3',
+    [orgId, hour, dayOfWeek]
+  )
+
+  const mu = (profile?.avg_speed_kmh && profile.avg_speed_kmh > 0) ? profile.avg_speed_kmh : 40.0
+  const count = profile?.sample_count ?? 0
+
+  return {
+    p10SpeedKmh: mu * 0.75,
+    p50SpeedKmh: mu,
+    p90SpeedKmh: mu * 1.15,
+    p99SpeedKmh: mu * 1.25,
+    sampleCount: count,
+  }
+}
+
 /**
  * Haversine great-circle distance between two lat/lon points, in kilometres.
  */

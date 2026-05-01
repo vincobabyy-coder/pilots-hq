@@ -1,5 +1,5 @@
 import { Middleware } from '../http/types'
-import { verify } from './jwt'
+import { verify, TokenExpiredError, JsonWebTokenError } from './jwt'
 
 // Routes that do not require authentication
 const PUBLIC_PATHS = [
@@ -19,7 +19,13 @@ export const authenticate: Middleware = async (req, res, next) => {
 
   const authHeader = req.headers['authorization'] ?? ''
   if (!authHeader.startsWith('Bearer ')) {
-    res.status(401).fail('UNAUTHORIZED', 'Missing or invalid Authorization header', 401)
+    res.status(401).json({
+      error: {
+        code: 'TOKEN_MISSING',
+        message: 'Authorization header required',
+        retryable: false,
+      },
+    })
     return
   }
 
@@ -33,6 +39,31 @@ export const authenticate: Middleware = async (req, res, next) => {
     req.userRole = payload.role
     await next()
   } catch (e) {
-    res.status(401).fail('UNAUTHORIZED', (e as Error).message, 401)
+    if (e instanceof TokenExpiredError) {
+      res.status(401).json({
+        error: {
+          code: 'TOKEN_EXPIRED',
+          message: 'Access token expired — use refresh token to obtain a new one',
+          retryable: true,
+        },
+      })
+    } else if (e instanceof JsonWebTokenError) {
+      res.status(401).json({
+        error: {
+          code: 'TOKEN_INVALID',
+          message: 'Access token is invalid',
+          retryable: false,
+        },
+      })
+    } else {
+      // Configuration error or other unexpected failure — do not leak internals
+      res.status(401).json({
+        error: {
+          code: 'TOKEN_INVALID',
+          message: 'Access token is invalid',
+          retryable: false,
+        },
+      })
+    }
   }
 }
