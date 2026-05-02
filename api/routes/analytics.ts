@@ -4,13 +4,14 @@ import { predictDelivery } from '../../engines/analytics/delivery-predictor'
 import { computePercentiles, buildHistogram, percentileFromHistogram } from '../../engines/analytics/percentile'
 import { decompose } from '../../engines/analytics/time-series'
 import { query } from '../../core/db/pool'
+import { logger } from '../../core/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function handleServiceError(err: unknown, res: import('../../core/http/types').PilotsResponse): void {
-  void err
+function handleServiceError(err: unknown, res: import('../../core/http/types').PilotsResponse, req?: { path: string; method: string }): void {
+  logger.error('Handler error', { error: (err as Error).message, path: req?.path, method: req?.method })
   res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
 }
 
@@ -97,7 +98,7 @@ export function analyticsRouter(): Router {
       )
       res.ok({ prediction })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -145,7 +146,7 @@ export function analyticsRouter(): Router {
         res.ok({ result })
       }
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -170,7 +171,7 @@ export function analyticsRouter(): Router {
       )
       res.ok({ decomposition })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -208,7 +209,7 @@ export function analyticsRouter(): Router {
       const { p50, p95, p99 } = computePercentiles(durations)
       res.ok({ stats: { count, p50, p95, p99, days } })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 

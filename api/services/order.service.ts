@@ -123,7 +123,30 @@ async function runAllocation(
 
   logger.info('Order allocated', { orderId: order.id, warehouseId, orgId })
 
-  return explainAllocation(allocationOrder, allocationWarehouses, whIndex, costMatrix)
+  const decision = explainAllocation(allocationOrder, allocationWarehouses, whIndex, costMatrix)
+
+  // Persist allocation decision for audit trail
+  if (decision) {
+    await query(
+      `INSERT INTO allocation_decisions
+         (org_id, order_id, assigned_warehouse_id, assigned_score,
+          runner_up_warehouse_id, runner_up_score, score_gap, reasoning, alternatives)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        orgId,
+        order.id,
+        decision.assignedWarehouseId,
+        decision.assignedCost,
+        decision.alternatives[0]?.warehouseId ?? null,
+        decision.alternatives[0]?.score ?? null,
+        decision.alternatives[0]?.costGap ?? null,
+        JSON.stringify(decision.factors),
+        JSON.stringify(decision.alternatives),
+      ]
+    )
+  }
+
+  return decision
 }
 
 export async function listOrders(

@@ -1,5 +1,6 @@
 import { Router } from '../../core/http/router'
 import { logger } from '../../core/logger/logger'
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '../../core/constants'
 import {
   listWarehouses,
   getWarehouse,
@@ -25,8 +26,8 @@ export function warehousesRouter(): Router {
   router.get('/', async (req, res) => {
     const q = req.query as Record<string, string>
 
-    const rawLimit = q.limit ? parseInt(q.limit, 10) : 20
-    const limit = Math.min(isNaN(rawLimit) ? 20 : rawLimit, 100)
+    const rawLimit = q.limit ? parseInt(q.limit, 10) : DEFAULT_PAGE_LIMIT
+    const limit = Math.min(isNaN(rawLimit) ? DEFAULT_PAGE_LIMIT : rawLimit, MAX_PAGE_LIMIT)
     const rawOffset = q.offset ? parseInt(q.offset, 10) : 0
     const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset
 
@@ -69,8 +70,8 @@ export function warehousesRouter(): Router {
     }
 
     const q = req.query as Record<string, string>
-    const rawLimit = q.limit ? parseInt(q.limit, 10) : 20
-    const limit = Math.min(isNaN(rawLimit) ? 20 : rawLimit, 100)
+    const rawLimit = q.limit ? parseInt(q.limit, 10) : DEFAULT_PAGE_LIMIT
+    const limit = Math.min(isNaN(rawLimit) ? DEFAULT_PAGE_LIMIT : rawLimit, MAX_PAGE_LIMIT)
     const rawOffset = q.offset ? parseInt(q.offset, 10) : 0
     const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset
 

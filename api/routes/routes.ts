@@ -35,13 +35,6 @@ async function getSolverMetadata(
   return result.solver
 }
 
-const optimizeSchema = v.object({
-  warehouseId: v.string().required(),
-  date: v.string().required(),
-  vehicleIds: v.string(),  // validated manually below — v doesn't have array type
-  orderIds: v.string(),    // validated manually below
-})
-
 const confirmSchema = v.object({
   driverId: v.string().required(),
 })

@@ -2,6 +2,7 @@ import { Router } from '../../core/http/router'
 import { query } from '../../core/db/pool'
 import { computeBill, forecastBill, persistBill } from '../../engines/pricing/engine'
 import type { BillingInputs } from '../../engines/pricing/engine'
+import { logger } from '../../core/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -9,9 +10,10 @@ import type { BillingInputs } from '../../engines/pricing/engine'
 
 function handleServiceError(
   err: unknown,
-  res: import('../../core/http/types').PilotsResponse
+  res: import('../../core/http/types').PilotsResponse,
+  req?: { path: string; method: string }
 ): void {
-  void err
+  logger.error('Handler error', { error: (err as Error).message, path: req?.path, method: req?.method })
   res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
 }
 
@@ -99,7 +101,7 @@ export function billingRouter(): Router {
       const auditId = await persistBill(bill)
       res.ok({ bill, auditId })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -125,7 +127,7 @@ export function billingRouter(): Router {
       const bill = forecastBill(parsed.inputs, periodStart, periodEnd)
       res.ok({ bill })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -181,7 +183,7 @@ export function billingRouter(): Router {
         },
       })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 

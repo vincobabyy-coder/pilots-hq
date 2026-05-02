@@ -3,13 +3,14 @@ import { detectAnomaly, detectAnomalies } from '../../engines/fraud/detector'
 import type { DetectorConfig } from '../../engines/fraud/detector'
 import { trainBaseline, getBaseline } from '../../engines/fraud/baseline'
 import { initCusumState, processBatch } from '../../engines/fraud/cusum'
+import { logger } from '../../core/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function handleServiceError(err: unknown, res: import('../../core/http/types').PilotsResponse): void {
-  void err
+function handleServiceError(err: unknown, res: import('../../core/http/types').PilotsResponse, req?: { path: string; method: string }): void {
+  logger.error('Handler error', { error: (err as Error).message, path: req?.path, method: req?.method })
   res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
 }
 
@@ -43,7 +44,7 @@ export function fraudRouter(): Router {
       )
       res.ok({ result })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -65,7 +66,7 @@ export function fraudRouter(): Router {
       )
       res.ok({ results })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -101,7 +102,7 @@ export function fraudRouter(): Router {
       )
       res.ok({ baseline })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -119,7 +120,7 @@ export function fraudRouter(): Router {
 
       res.ok({ baseline })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 
@@ -153,7 +154,7 @@ export function fraudRouter(): Router {
       const results = processBatch(state, body.observations as number[])
       res.ok({ results, finalState: results[results.length - 1].newState })
     } catch (err) {
-      handleServiceError(err, res)
+      handleServiceError(err, res, req)
     }
   })
 

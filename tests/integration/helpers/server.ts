@@ -20,6 +20,8 @@ import { analyticsRouter } from '../../../api/routes/analytics'
 import { fraudRouter } from '../../../api/routes/fraud'
 import { billingRouter } from '../../../api/routes/billing'
 import { jobsRouter } from '../../../api/routes/jobs'
+import { routesRouter } from '../../../api/routes/routes'
+import { driversRouter } from '../../../api/routes/drivers'
 
 export function loadEnv(): void {
   try {
@@ -65,6 +67,8 @@ export async function startTestServer(): Promise<string> {
   app.mount('/api/v1/fraud', fraudRouter())
   app.mount('/api/v1/billing', billingRouter())
   app.mount('/api/v1/jobs', jobsRouter())
+  app.mount('/api/v1/routes', routesRouter())
+  app.mount('/api/v1/drivers', driversRouter())
 
   const httpServer = app.initHttpServer()
 

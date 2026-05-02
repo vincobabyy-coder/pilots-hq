@@ -1,5 +1,6 @@
 import { Router } from '../../core/http/router'
 import { getDlqJobs, replayDlqJob, getJobTrace } from '../../core/queue/queue'
+import { logger } from '../../core/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Router
@@ -19,7 +20,7 @@ export function jobsRouter(): Router {
       const jobs = await getDlqJobs(queueName, 20)
       res.ok({ jobs, meta: { count: jobs.length, queue: queueName } })
     } catch (err) {
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
@@ -47,7 +48,7 @@ export function jobsRouter(): Router {
       if (message.includes('not found')) {
         res.status(404).fail('JOB_NOT_FOUND', `Job "${jobId}" not found in store`, 404); return
       }
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
@@ -68,7 +69,7 @@ export function jobsRouter(): Router {
       const trace = await getJobTrace(jobId)
       res.ok({ jobId, trace })
     } catch (err) {
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })

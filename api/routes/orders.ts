@@ -1,6 +1,8 @@
 import { Router } from '../../core/http/router'
 import * as orderService from '../services/order.service'
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '../../core/constants'
 import { AllocationOrder } from '../../engines/allocation/bipartite-graph'
+import { logger } from '../../core/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,9 +85,7 @@ export function ordersRouter(): Router {
       })
       res.status(201).ok({ order })
     } catch (err) {
-      const e = err as Error
-      // Log but never leak raw error messages to clients
-      void e
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
@@ -95,8 +95,8 @@ export function ordersRouter(): Router {
     const q = req.query as Record<string, string>
 
     const status = q.status
-    const rawLimit = q.limit ? parseInt(q.limit, 10) : 20
-    const limit = Math.min(isNaN(rawLimit) ? 20 : rawLimit, 100)
+    const rawLimit = q.limit ? parseInt(q.limit, 10) : DEFAULT_PAGE_LIMIT
+    const limit = Math.min(isNaN(rawLimit) ? DEFAULT_PAGE_LIMIT : rawLimit, MAX_PAGE_LIMIT)
     const rawOffset = q.offset ? parseInt(q.offset, 10) : 0
     const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset
 
@@ -104,7 +104,7 @@ export function ordersRouter(): Router {
       const { orders, total } = await orderService.listOrders(req.orgId!, { status, limit, offset })
       res.ok({ orders, meta: { total, limit, offset } })
     } catch (err) {
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
@@ -124,7 +124,7 @@ export function ordersRouter(): Router {
       }
       res.ok({ order })
     } catch (err) {
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
@@ -149,7 +149,7 @@ export function ordersRouter(): Router {
         decision,
       })
     } catch (err) {
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
@@ -193,7 +193,7 @@ export function ordersRouter(): Router {
 
       res.ok({ result })
     } catch (err) {
-      void err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
       res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })

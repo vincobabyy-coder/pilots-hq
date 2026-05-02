@@ -1,5 +1,6 @@
 import { Router } from '../../core/http/router'
 import * as shipmentService from '../services/shipment.service'
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '../../core/constants'
 import { eventBus } from '../../core/events/event-bus'
 import { updateSpeedProfile } from '../../engines/route-optimizer/distance-matrix'
 import { query } from '../../core/db/pool'
@@ -87,8 +88,8 @@ export function shipmentsRouter(): Router {
 
     const status = query.status
     const page = query.page ? parseInt(query.page, 10) : 1
-    const rawLimit = query.limit ? parseInt(query.limit, 10) : 20
-    const limit = Math.min(rawLimit, 100)
+    const rawLimit = query.limit ? parseInt(query.limit, 10) : DEFAULT_PAGE_LIMIT
+    const limit = Math.min(rawLimit, MAX_PAGE_LIMIT)
 
     try {
       const { shipments, total } = await shipmentService.listShipments(req.orgId!, { status, page, limit })
