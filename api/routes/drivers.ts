@@ -1,5 +1,6 @@
 import { Router } from '../../core/http/router'
 import * as shipmentService from '../services/shipment.service'
+import { logger } from '../../core/logger/logger'
 
 export function driversRouter(): Router {
   const router = new Router()
@@ -29,7 +30,8 @@ export function driversRouter(): Router {
         res.status(e.statusCode).fail(e.code ?? 'ERROR', e.message ?? 'Error', e.statusCode)
         return
       }
-      throw err
+      logger.error('Handler error', { error: (err as Error).message, path: req.path, method: req.method })
+      res.status(500).fail('INTERNAL_ERROR', 'Internal server error', 500)
     }
   })
 

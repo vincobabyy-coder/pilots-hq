@@ -145,8 +145,9 @@ export async function enqueueFull<T>(
 }
 
 export async function getFullJob(jobId: string): Promise<FullJob | null> {
-  const r = getRedis()
-  const raw = await r.hgetall(jobKey(jobId))
+  try {
+    const r = getRedis()
+    const raw = await r.hgetall(jobKey(jobId))
   if (!raw || Object.keys(raw).length === 0) return null
 
   const job: FullJob = {
@@ -166,6 +167,10 @@ export async function getFullJob(jobId: string): Promise<FullJob | null> {
   if (raw['result']) job.result = JSON.parse(raw['result'])
   if (raw['error']) job.error = raw['error']
   return job
+  } catch (err) {
+    logger.warn('getFullJob failed (Redis unavailable)', { jobId, error: (err as Error).message })
+    return null
+  }
 }
 
 export async function requeueJob(jobId: string, queueName: string, delayMs: number): Promise<void> {
@@ -201,49 +206,64 @@ export async function moveToDlq(jobId: string, queueName: string): Promise<void>
 }
 
 export async function getDlqJobs(queueName: string, limit = 50): Promise<FullJob[]> {
-  const r = getRedis()
-  const ids = await r.lrange(dlqKey(queueName), -limit, -1)
-  const jobs = await Promise.all(ids.map(id => getFullJob(id)))
-  return jobs.filter((j): j is FullJob => j !== null)
+  try {
+    const r = getRedis()
+    const ids = await r.lrange(dlqKey(queueName), -limit, -1)
+    const jobs = await Promise.all(ids.map(id => getFullJob(id)))
+    return jobs.filter((j): j is FullJob => j !== null)
+  } catch (err) {
+    logger.warn('getDlqJobs failed (Redis unavailable)', { queueName, error: (err as Error).message })
+    return []
+  }
 }
 
 // Takes a job from the DLQ, resets attempts to 0, clears executionTrace,
 // and re-enqueues it in the normal priority queue.
 // Returns the NEW job ID (same payload, fresh state).
 export async function replayDlqJob(jobId: string, queueName: string): Promise<string> {
-  const r = getRedis()
-  const original = await getFullJob(jobId)
-  if (!original) {
-    throw new Error(`Job "${jobId}" not found — cannot replay`)
+  try {
+    const r = getRedis()
+    const original = await getFullJob(jobId)
+    if (!original) {
+      throw new Error(`Job "${jobId}" not found — cannot replay`)
+    }
+
+    const now = new Date().toISOString()
+    const newId = randomUUID()
+
+    // Build a fresh job from the original's inputSnapshot so the payload is
+    // exactly what was submitted at enqueue time (not a potentially mutated value).
+    const freshJob: FullJob = {
+      ...original,
+      id: newId,
+      status: 'pending',
+      attempts: 0,
+      executionTrace: [],
+      result: undefined,
+      error: undefined,
+      createdAt: now,
+      updatedAt: now,
+      // Restore payload from the immutable snapshot
+      payload: original.inputSnapshot,
+    }
+
+    await saveFullJob(r, freshJob)
+    await r.rpush(listKey(queueName, freshJob.priority), newId)
+    logger.info('DLQ job replayed', { originalJobId: jobId, newJobId: newId, queue: queueName })
+    return newId
+  } catch (err) {
+    logger.warn('replayDlqJob failed', { jobId, queueName, error: (err as Error).message })
+    throw err
   }
-
-  const now = new Date().toISOString()
-  const newId = randomUUID()
-
-  // Build a fresh job from the original's inputSnapshot so the payload is
-  // exactly what was submitted at enqueue time (not a potentially mutated value).
-  const freshJob: FullJob = {
-    ...original,
-    id: newId,
-    status: 'pending',
-    attempts: 0,
-    executionTrace: [],
-    result: undefined,
-    error: undefined,
-    createdAt: now,
-    updatedAt: now,
-    // Restore payload from the immutable snapshot
-    payload: original.inputSnapshot,
-  }
-
-  await saveFullJob(r, freshJob)
-  await r.rpush(listKey(queueName, freshJob.priority), newId)
-  logger.info('DLQ job replayed', { originalJobId: jobId, newJobId: newId, queue: queueName })
-  return newId
 }
 
 // Returns the executionTrace for a job, or an empty array if not found.
 export async function getJobTrace(jobId: string): Promise<JobAttemptRecord[]> {
-  const job = await getFullJob(jobId)
-  return job?.executionTrace ?? []
+  try {
+    const job = await getFullJob(jobId)
+    return job?.executionTrace ?? []
+  } catch (err) {
+    logger.warn('getJobTrace failed (Redis unavailable)', { jobId, error: (err as Error).message })
+    return []
+  }
 }

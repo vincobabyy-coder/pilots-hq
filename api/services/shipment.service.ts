@@ -183,6 +183,15 @@ export async function updateDriverLocation(
   lat: number,
   lon: number
 ): Promise<void> {
+  // 0. Verify driver exists
+  const driver = await query<{ id: string }>(
+    'SELECT id FROM drivers WHERE id = $1 AND org_id = $2',
+    [driverId, orgId]
+  )
+  if (driver.length === 0) {
+    throw makeError(`Driver "${driverId}" not found`, 'DRIVER_NOT_FOUND', 404)
+  }
+
   // 1. Update driver's current coordinates
   await query(
     'UPDATE drivers SET current_lat = $1, current_lon = $2, updated_at = NOW() WHERE id = $3 AND org_id = $4',

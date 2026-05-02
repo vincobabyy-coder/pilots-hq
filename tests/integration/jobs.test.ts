@@ -18,7 +18,7 @@ describe('Jobs Integration', () => {
     expect(typeof token).toBe('string')
   })
 
-  // GET /:queueName/dlq has no auth guard — returns 200 for any caller
+  // GET /:queueName/dlq has auth guard via middleware
   it('GET /api/v1/jobs/:queueName/dlq with auth returns 200 with jobs array', async () => {
     const res = await request('GET', `/api/v1/jobs/${UNKNOWN_QUEUE}/dlq`, { token })
     expect(res.status).toBe(200)
@@ -29,11 +29,9 @@ describe('Jobs Integration', () => {
     expect(data.meta.queue).toBe(UNKNOWN_QUEUE)
   })
 
-  it('GET /api/v1/jobs/:queueName/dlq without auth returns 200 with jobs array', async () => {
+  it('GET /api/v1/jobs/:queueName/dlq without auth returns 401', async () => {
     const res = await request('GET', `/api/v1/jobs/${UNKNOWN_QUEUE}/dlq`)
-    expect(res.status).toBe(200)
-    const data = (res.body as any).data as any
-    expect(Array.isArray(data.jobs)).toBe(true)
+    expect(res.status).toBe(401)
   })
 
   it('POST /api/v1/jobs/:queueName/dlq/:jobId/replay without auth returns 401', async () => {
