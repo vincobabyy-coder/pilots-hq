@@ -157,10 +157,10 @@ async function handleStripeWebhook(
     }
 
     // Route to handler based on event type
-    if (event.type === 'invoice.payment_succeeded') {
-      await stripeConnector.onInvoicePaid(payload)
-    } else if (event.type === 'invoice.payment_failed') {
-      await stripeConnector.onInvoicePaymentFailed(payload)
+    if (event.type === 'invoice.paid') {
+      await stripeConnector.handleInvoicePaid(payload)
+    } else if (event.type === 'payment_intent.payment_failed') {
+      await stripeConnector.handlePaymentFailed(payload)
     } else if (event.type === 'customer.subscription.updated') {
       logger.info('Subscription updated', { customerId: event.object.customer })
     } else {
