@@ -1,0 +1,153 @@
+{
+  "alerts": {
+    "api_latency_p99": {
+      "warning": 1000,
+      "critical": 5000,
+      "description": "API response time 99th percentile in milliseconds"
+    },
+    "api_latency_p95": {
+      "warning": 500,
+      "critical": 2000,
+      "description": "API response time 95th percentile in milliseconds"
+    },
+    "error_rate": {
+      "warning": 0.01,
+      "critical": 0.05,
+      "description": "Error rate (5xx) as fraction of requests"
+    },
+    "webhook_processing_time": {
+      "warning": 2000,
+      "critical": 10000,
+      "description": "Webhook processing time in milliseconds"
+    },
+    "webhook_error_rate": {
+      "warning": 0.05,
+      "critical": 0.1,
+      "description": "Webhook error rate as fraction"
+    },
+    "rate_limit_exceeded": {
+      "warning": 10,
+      "critical": 100,
+      "description": "Number of rate limit 429 responses per minute"
+    },
+    "database_connection_pool": {
+      "warning": 0.8,
+      "critical": 0.95,
+      "description": "Connection pool utilization ratio"
+    },
+    "database_query_time": {
+      "warning": 1000,
+      "critical": 5000,
+      "description": "Slow query detection in milliseconds"
+    },
+    "redis_memory_usage": {
+      "warning": 0.8,
+      "critical": 0.95,
+      "description": "Redis memory utilization ratio"
+    },
+    "jwt_token_validation_failures": {
+      "warning": 1,
+      "critical": 10,
+      "description": "Invalid JWT attempts per minute"
+    },
+    "auth_failures": {
+      "warning": 5,
+      "critical": 50,
+      "description": "Authentication failures per minute"
+    },
+    "brute_force_lockouts": {
+      "warning": 1,
+      "critical": 10,
+      "description": "Accounts locked due to brute force attempts per hour"
+    },
+    "multi_tenant_isolation_violations": {
+      "warning": 0,
+      "critical": 1,
+      "description": "Detected cross-tenant data access attempts"
+    },
+    "webhook_signature_validation_failures": {
+      "warning": 1,
+      "critical": 10,
+      "description": "Failed webhook signature verifications per minute"
+    },
+    "idempotency_cache_hits": {
+      "warning": 0.5,
+      "critical": null,
+      "description": "Idempotency cache hit rate (should be > 50%)"
+    },
+    "webhook_processing_queue_depth": {
+      "warning": 100,
+      "critical": 1000,
+      "description": "Number of pending webhook events"
+    }
+  },
+
+  "slas": {
+    "api_availability": {
+      "target": 0.999,
+      "description": "API endpoint availability (99.9%)"
+    },
+    "webhook_delivery": {
+      "target": 0.99,
+      "description": "Webhook delivery success rate (99%)"
+    },
+    "auth_system_availability": {
+      "target": 0.9999,
+      "description": "Auth system availability (99.99%)"
+    }
+  },
+
+  "dashboards": {
+    "api_health": {
+      "metrics": [
+        "api_latency_p99",
+        "api_latency_p95",
+        "error_rate",
+        "requests_per_minute"
+      ],
+      "refresh_interval_seconds": 30
+    },
+    "webhook_health": {
+      "metrics": [
+        "webhook_processing_time",
+        "webhook_error_rate",
+        "webhook_signature_validation_failures",
+        "webhook_processing_queue_depth",
+        "idempotency_cache_hits"
+      ],
+      "refresh_interval_seconds": 30
+    },
+    "security": {
+      "metrics": [
+        "jwt_token_validation_failures",
+        "auth_failures",
+        "brute_force_lockouts",
+        "multi_tenant_isolation_violations"
+      ],
+      "refresh_interval_seconds": 60
+    },
+    "infrastructure": {
+      "metrics": [
+        "database_connection_pool",
+        "database_query_time",
+        "redis_memory_usage",
+        "cpu_usage",
+        "memory_usage"
+      ],
+      "refresh_interval_seconds": 60
+    }
+  },
+
+  "escalation_policy": {
+    "warning": {
+      "notify": ["slack-dev-channel"],
+      "delay_minutes": 5,
+      "description": "Notify dev team via Slack, wait 5 min before escalating"
+    },
+    "critical": {
+      "notify": ["slack-oncall", "pagerduty"],
+      "delay_minutes": 1,
+      "description": "Immediate notification to on-call engineer via PagerDuty"
+    }
+  }
+}

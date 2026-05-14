@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pilots-config
+  labels:
+    app: pilots
+data:
+  # API Configuration
+  API_HOST: "0.0.0.0"
+  API_PORT: "3001"
+
+  # Logging
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # Rate Limiting
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_DEFAULT_REQUESTS: "100"
+
+  # JWT Configuration
+  JWT_ACCESS_TOKEN_TTL_MINUTES: "15"
+  JWT_REFRESH_TOKEN_TTL_DAYS: "7"
+
+  # Multi-tenant
+  ENFORCE_ORG_ID_FILTERING: "true"
+
+  # Webhooks
+  WEBHOOK_IDEMPOTENCY_TTL_HOURS: "24"
+  WEBHOOK_SIGNATURE_TIMEOUT_MS: "5000"
+
+  # Database
+  DATABASE_POOL_MIN: "5"
+  DATABASE_POOL_MAX: "20"
+  DATABASE_SSL_MODE: "require"
+
+  # Redis
+  REDIS_SENTINEL_ENABLED: "false"
+  REDIS_SENTINEL_NAME: "mymaster"
+
+  # Feature Flags
+  ENABLE_ROUTE_OPTIMIZATION: "true"
+  ENABLE_BACKGROUND_JOBS: "true"
+
+  # Monitoring
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+
+  # Integration timeouts
+  SHOPIFY_TIMEOUT_MS: "10000"
+  STRIPE_TIMEOUT_MS: "10000"
+  TWILIO_TIMEOUT_MS: "10000"

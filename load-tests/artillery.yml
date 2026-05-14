@@ -1,0 +1,227 @@
+config:
+  target: "http://localhost:3001"
+  phases:
+    # Warmup: gradual ramp-up
+    - duration: 30
+      arrivalRate: 5
+      name: "Warmup"
+
+    # Sustained: constant load
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+
+    # Spike: sudden burst (stress test)
+    - duration: 60
+      arrivalRate: 200
+      name: "Spike"
+
+    # Cooldown: gradual ramp-down
+    - duration: 30
+      arrivalRate: 5
+      name: "Cooldown"
+
+  # Report generation
+  metrics:
+    includes:
+      - p99
+      - p95
+      - p50
+
+  processor: "./processor.js"
+
+scenarios:
+  # Authentication endpoints
+  - name: "Auth: Login"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ $randomString(8) }}@test.com"
+            password: "TestPassword123!"
+          expect:
+            - statusCode: [200, 401]
+          capture:
+            json: "$.accessToken"
+            as: "accessToken"
+
+  - name: "Auth: Refresh Token"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ $randomString(8) }}@test.com"
+            password: "TestPassword123!"
+          capture:
+            json: "$.refreshToken"
+            as: "refreshToken"
+      - post:
+          url: "/api/auth/refresh"
+          json:
+            refreshToken: "{{ refreshToken }}"
+          expect:
+            - statusCode: [200, 401]
+
+  # Order endpoints (multi-tenant)
+  - name: "Orders: Create Order"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/orders"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            X-Org-ID: "{{ $randomString(10) }}"
+          json:
+            customer_name: "{{ $randomString(5) }} {{ $randomString(7) }}"
+            customer_email: "{{ $randomString(8) }}@test.com"
+            customer_phone: "+1234567890"
+            destination_address:
+              street: "{{ $randomNumber(1, 999) }} Main St"
+              city: "Lagos"
+              state: "Lagos"
+              postal_code: "100001"
+              country: "NG"
+            items:
+              - sku: "SKU-{{ $randomNumber(1000, 9999) }}"
+                name: "Product {{ $randomNumber(1, 100) }}"
+                quantity: 1
+                weight_kg: "{{ $randomNumber(0.5, 5) }}"
+            total_weight_kg: "{{ $randomNumber(0.5, 5) }}"
+          expect:
+            - statusCode: [201, 400, 401]
+          capture:
+            json: "$.id"
+            as: "orderId"
+
+  - name: "Orders: List Orders"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/orders?limit=50&offset=0"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            X-Org-ID: "{{ $randomString(10) }}"
+          expect:
+            - statusCode: [200, 401]
+
+  - name: "Orders: Get Order Details"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/orders/{{ orderId }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            X-Org-ID: "{{ $randomString(10) }}"
+          expect:
+            - statusCode: [200, 404, 401]
+
+  # Route optimization
+  - name: "Routes: Plan Routes"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/routes/plan"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            X-Org-ID: "{{ $randomString(10) }}"
+          json:
+            warehouse_id: "warehouse-{{ $randomNumber(1, 5) }}"
+            planning_horizon_minutes: 120
+          expect:
+            - statusCode: [200, 400, 401]
+
+  # Integrations: Webhooks
+  - name: "Shopify: Order Webhook"
+    weight: 5
+    flow:
+      - post:
+          url: "/webhooks/shopify/orders/create"
+          headers:
+            X-Shopify-Hmac-SHA256: "{{ $randomString(40) }}"
+          json:
+            id: "{{ $randomNumber(1000000000, 9999999999) }}"
+            order_number: "{{ $randomNumber(1000, 9999) }}"
+            customer:
+              id: "{{ $randomNumber(1000000, 9999999) }}"
+              first_name: "John"
+              last_name: "Doe"
+              email: "john@example.com"
+            shipping_address:
+              address1: "123 Main St"
+              city: "Lagos"
+              province: "Lagos"
+              country: "Nigeria"
+              zip: "100001"
+            line_items:
+              - id: "{{ $randomNumber(10000000000, 99999999999) }}"
+                sku: "SKU-001"
+                title: "Product Name"
+                quantity: 1
+                grams: 1000
+                product_id: "{{ $randomNumber(1000000000, 9999999999) }}"
+            total_weight: 1000
+            financial_status: "paid"
+            fulfillment_status: null
+          expect:
+            - statusCode: [200, 400, 401]
+
+  - name: "Stripe: Invoice Webhook"
+    weight: 3
+    flow:
+      - post:
+          url: "/webhooks/stripe/invoice.paid"
+          headers:
+            Stripe-Signature: "t={{ $timestamp }},v1={{ $randomString(40) }}"
+          json:
+            type: "invoice.payment_succeeded"
+            object:
+              id: "in_{{ $randomString(20) }}"
+              customer: "cus_{{ $randomString(15) }}"
+              status: "paid"
+              amount_paid: 9999
+          expect:
+            - statusCode: [200, 400, 401]
+
+  # Data quality & anomaly detection
+  - name: "Orders: Detect Anomalies"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/orders/{{ orderId }}/anomalies"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            X-Org-ID: "{{ $randomString(10) }}"
+          json:
+            actual_duration_minutes: "{{ $randomNumber(10, 300) }}"
+            distance_km: "{{ $randomNumber(1, 100) }}"
+            success: "{{ $randomChoice([true, false]) }}"
+          expect:
+            - statusCode: [200, 401]
+
+  # Rate limiting tests
+  - name: "Auth: Brute Force (Rate Limited)"
+    weight: 2
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "attacker@test.com"
+            password: "WrongPassword123!"
+          expect:
+            - statusCode: [401, 429]
+
+# Configuration for sustained and spike testing
+variables:
+  accessToken: "{{ $randomString(40) }}"
+
+after:
+  flow:
+    - log: "Load test completed"
+
+# Performance thresholds
+defaults:
+  http:
+    timeout: 10
+    max: 100

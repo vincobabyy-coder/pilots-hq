@@ -17,16 +17,35 @@ export async function buildRequest(raw: IncomingMessage): Promise<PilotsRequest>
   const path = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex)
   const queryStr = qIndex === -1 ? '' : rawUrl.slice(qIndex + 1)
 
-  // Parse JSON body
+  // Collect raw bytes and parse JSON body
   let body: unknown = null
+  let rawBody: Buffer | undefined
   const contentType = raw.headers['content-type'] ?? ''
   if (contentType.includes('application/json')) {
-    body = await new Promise((resolve, reject) => {
+    const result = await new Promise<{ data: string; buffers: Buffer[] }>((resolve, reject) => {
       let data = ''
-      raw.on('data', chunk => { data += chunk })
+      const buffers: Buffer[] = []
+      raw.on('data', (chunk: Buffer) => {
+        buffers.push(chunk)
+        data += chunk.toString()
+      })
       raw.on('end', () => {
-        try { resolve(JSON.parse(data || 'null')) }
-        catch { resolve(null) }
+        resolve({ data, buffers })
+      })
+      raw.on('error', reject)
+    })
+    rawBody = Buffer.concat(result.buffers)
+    try { body = JSON.parse(result.data || 'null') }
+    catch { body = null }
+  } else if (raw.headers['content-length']) {
+    // For non-JSON requests with a body, still capture rawBody for webhook handlers
+    rawBody = await new Promise((resolve, reject) => {
+      const buffers: Buffer[] = []
+      raw.on('data', (chunk: Buffer) => {
+        buffers.push(chunk)
+      })
+      raw.on('end', () => {
+        resolve(Buffer.concat(buffers))
       })
       raw.on('error', reject)
     })
@@ -46,6 +65,7 @@ export async function buildRequest(raw: IncomingMessage): Promise<PilotsRequest>
     params: {},
     headers,
     body,
+    rawBody,
     requestId: randomUUID(),
   }
 }

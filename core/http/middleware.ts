@@ -10,6 +10,28 @@ export const securityHeaders: Middleware = async (_req, res, next) => {
   await next()
 }
 
+export const httpsEnforcement: Middleware = async (req, res, next) => {
+  // Only enforce HTTPS in production
+  if (process.env.NODE_ENV !== 'production') {
+    return await next()
+  }
+
+  // Check X-Forwarded-Proto header (set by reverse proxy/load balancer)
+  const forwardedProto = req.headers['x-forwarded-proto'] as string | undefined
+  if (forwardedProto && forwardedProto.toLowerCase() === 'http') {
+    // Construct HTTPS URL
+    const host = req.headers.host || 'example.com'
+    const path = req.url || '/'
+    const httpsUrl = `https://${host}${path}`
+
+    // 301 Permanent Redirect
+    res.status(301).setHeader('Location', httpsUrl).json({})
+    return
+  }
+
+  await next()
+}
+
 export const cors = (allowedOrigins: string[] = ['*']): Middleware => async (req, res, next) => {
   const origin = req.headers['origin'] ?? ''
   const allowed = allowedOrigins.includes('*') || allowedOrigins.includes(origin)

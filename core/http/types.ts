@@ -8,6 +8,7 @@ export interface PilotsRequest {
   params: Record<string, string>
   headers: Record<string, string>
   body: unknown
+  rawBody?: Buffer // Raw request body bytes (for webhook HMAC verification, etc.)
   requestId: string
   userId?: string
   orgId?: string

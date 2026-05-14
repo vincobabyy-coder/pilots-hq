@@ -1,11 +1,11 @@
 import { Router } from '../../core/http/router'
 import { v } from '../../core/validation/schema'
 import { login, refresh, getMe } from '../services/auth.service'
-import { decodeToken, TokenExpiredError, JsonWebTokenError } from '../../core/auth/jwt'
+import { decodeToken, TokenExpiredError, JsonWebTokenError, blacklistToken } from '../../core/auth/jwt'
 
 const loginSchema = v.object({
   email: v.string().required().email(),
-  password: v.string().required().min(8),
+  password: v.string().required().min(1),
 })
 
 const refreshSchema = v.object({
@@ -109,6 +109,25 @@ export function authRouter(): Router {
       tier: payload.role,
       ttlSeconds,
     })
+  })
+
+  router.post('/logout', async (req, res) => {
+    if (!req.userId) { res.status(401).fail('UNAUTHORIZED', 'Not authenticated', 401); return }
+
+    const authHeader = req.headers['authorization'] ?? ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+
+    if (!token) {
+      res.status(401).fail('UNAUTHORIZED', 'Not authenticated', 401)
+      return
+    }
+
+    try {
+      await blacklistToken(token)
+      res.ok({ loggedOut: true })
+    } catch (e) {
+      res.status(500).fail('LOGOUT_FAILED', 'Failed to log out', 500)
+    }
   })
 
   return router

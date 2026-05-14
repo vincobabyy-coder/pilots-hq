@@ -40,12 +40,14 @@ export function greedyInit(input: SolverInput): SolverResult {
     totalVolumeCbm: number
   }
 
+  const buffer = Math.min(Math.max(input.bufferCapacityFraction ?? 0, 0), 1)
+
   const vehicleStates: VehicleState[] = input.vehicles.map((v) => ({
     vehicleId: v.id,
     currentLat: input.warehouseLat,
     currentLon: input.warehouseLon,
-    remainingKg: v.capacityKg,
-    remainingCbm: v.capacityCbm,
+    remainingKg: v.capacityKg * (1 - buffer),
+    remainingCbm: v.capacityCbm * (1 - buffer),
     cumulativeMinutes: 0,
     stops: [],
     totalDistanceKm: 0,

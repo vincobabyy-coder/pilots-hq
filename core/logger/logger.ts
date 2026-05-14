@@ -1,3 +1,5 @@
+import { sanitizeLogContext } from './sanitize'
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface LogContext {
@@ -21,7 +23,8 @@ function log(level: LogLevel, msg: string, context: LogContext = {}): void {
   if (LEVEL_ORDER[level] < LEVEL_ORDER[getConfiguredLevel()]) return
   let entry: string
   try {
-    entry = JSON.stringify({ level, ts: new Date().toISOString(), msg, ...context })
+    const safe = sanitizeLogContext(context as Record<string, unknown>)
+    entry = JSON.stringify({ level, ts: new Date().toISOString(), msg, ...safe })
   } catch {
     entry = JSON.stringify({ level, ts: new Date().toISOString(), msg, _serializeError: true })
   }

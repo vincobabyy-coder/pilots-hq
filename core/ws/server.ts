@@ -3,6 +3,7 @@ import * as crypto from 'crypto'
 import { WsConnection } from './connection'
 import { RoomManager } from './rooms'
 import { logger } from '../logger/logger'
+import { verify as jwtVerify, JsonWebTokenError, TokenExpiredError } from '../auth/jwt'
 
 export type UpgradeHandler = (
   conn: WsConnection,
@@ -69,6 +70,33 @@ export class WsServer {
           upgrade: upgradeHeader ?? '',
         })
         return
+      }
+
+      // JWT authentication — only enforced when JWT_SECRET is configured
+      const jwtSecret = process.env.JWT_SECRET
+      if (jwtSecret) {
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const token = url.searchParams.get('token')
+
+        if (!token) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n')
+          socket.destroy()
+          logger.warn('WsServer rejected connection: missing token', { url: req.url ?? '' })
+          return
+        }
+
+        try {
+          const payload = jwtVerify(token, jwtSecret)
+          // Attach org/user context to the request for the upgrade handler
+          ;(req as http.IncomingMessage & { wsOrgId?: string; wsUserId?: string }).wsOrgId = payload.org
+          ;(req as http.IncomingMessage & { wsOrgId?: string; wsUserId?: string }).wsUserId = payload.sub
+        } catch (err) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n')
+          socket.destroy()
+          const reason = err instanceof TokenExpiredError ? 'expired' : err instanceof JsonWebTokenError ? 'invalid' : 'error'
+          logger.warn('WsServer rejected connection: invalid token', { url: req.url ?? '', reason })
+          return
+        }
       }
 
       // RFC 6455 §4.2.2 — compute Sec-WebSocket-Accept

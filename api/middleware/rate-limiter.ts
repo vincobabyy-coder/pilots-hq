@@ -136,6 +136,15 @@ export function rateLimiter(config?: RateLimitConfig): Middleware {
         const retryAfter = oldest.length >= 2
           ? Math.ceil((parseInt(oldest[1]) + limit.windowMs - now) / 1000)
           : Math.ceil(limit.windowMs / 1000)
+
+        // Track rate limit hits for security monitoring
+        try {
+          await r.incr('pilots:metrics:rate_limit_hits:1h')
+          await r.expire('pilots:metrics:rate_limit_hits:1h', 3600)
+        } catch {
+          // Swallow errors; tracking is best-effort
+        }
+
         res.setHeader('Retry-After', String(retryAfter))
         res.status(429).fail('RATE_LIMITED', 'Too many requests', 429)
         return

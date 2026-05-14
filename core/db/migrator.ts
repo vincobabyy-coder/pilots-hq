@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { query } from './pool'
 import { logger } from '../logger/logger'
+import { migrateEncryptFields } from '../crypto/field-encryption'
 
 const MIGRATIONS_DIR = join(process.cwd(), 'db', 'migrations')
 
@@ -46,4 +47,15 @@ export async function migrate(): Promise<void> {
   }
 
   logger.info(`Migrations complete. Applied ${pending.length} migration(s).`)
+
+  // Encrypt any plaintext sensitive fields left by migration 022.
+  // Safe to call even if migration 022 hasn't run (function is a no-op then).
+  if (process.env.ENCRYPTION_KEY) {
+    try {
+      await migrateEncryptFields()
+    } catch (err) {
+      logger.error('Field encryption migration failed — refusing to start', { error: (err as Error).message })
+      process.exit(1)
+    }
+  }
 }

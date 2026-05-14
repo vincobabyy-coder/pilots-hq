@@ -4,6 +4,7 @@ import { AllocationOrder, AllocationWarehouse, buildCostMatrix } from '../../eng
 import { hungarian } from '../../engines/allocation/hungarian'
 import { explainAllocation, whatIfExclude, AllocationDecision } from '../../engines/allocation/decision'
 import { eventBus } from '../../core/events/event-bus'
+import { auditLogger, type AuditEntry } from '../../core/audit/audit-logger'
 
 export { AllocationDecision }
 
@@ -22,7 +23,11 @@ export interface CreateOrderInput {
   scheduledDeliveryDate?: string
 }
 
-export async function createOrder(orgId: string, input: CreateOrderInput): Promise<Record<string, unknown>> {
+export async function createOrder(
+  orgId: string,
+  input: CreateOrderInput,
+  ctx: Omit<AuditEntry, 'orgId' | 'action' | 'resource'> & { actorId?: string; actorEmail?: string; ipAddress?: string; userAgent?: string } = {}
+): Promise<Record<string, unknown>> {
   const rows = await query<Record<string, unknown>>(
     `INSERT INTO orders (org_id, customer_id, order_number, origin_address, destination_address,
        dest_lat, dest_lon, items, total_weight_kg, total_volume_cbm, scheduled_delivery_date, status)
@@ -43,6 +48,18 @@ export async function createOrder(orgId: string, input: CreateOrderInput): Promi
     ]
   )
   const order = rows[0]
+
+  await auditLogger.logMutation({
+    orgId,
+    actorId: ctx.actorId,
+    actorEmail: ctx.actorEmail,
+    action: 'order.created',
+    resource: 'order',
+    resourceId: order.id as string,
+    newValues: { orderNumber: input.orderNumber, status: 'pending' },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  })
 
   // Auto-allocate if coordinates are available
   if (input.destLat != null && input.destLon != null) {

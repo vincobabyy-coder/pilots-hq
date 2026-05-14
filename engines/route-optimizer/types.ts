@@ -39,6 +39,8 @@ export interface SolverInput {
   vehicles: Vehicle[]
   stops: Stop[]
   date: Date    // used to derive dayOfWeek for speed profiles
+  /** Reserve this fraction of each vehicle's capacity as a buffer (0–1). Default 0. */
+  bufferCapacityFraction?: number
 }
 
 export interface SolverResult {

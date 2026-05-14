@@ -1,5 +1,5 @@
 import { Middleware } from '../http/types'
-import { verify, TokenExpiredError, JsonWebTokenError } from './jwt'
+import { verify, TokenExpiredError, JsonWebTokenError, isBlacklisted } from './jwt'
 
 // Routes that do not require authentication
 const PUBLIC_PATHS = [
@@ -7,6 +7,11 @@ const PUBLIC_PATHS = [
   'POST /api/v1/auth/refresh',
   'GET /api/v1/tracking',  // customer portal — prefix match
   'GET /api/v1/health',
+  'POST /api/v1/webhooks/shopify',  // Shopify webhook signature verification
+  'POST /api/v1/webhooks/stripe',   // Stripe webhook signature verification
+  'POST /api/v1/webhooks/twilio',   // Twilio webhook signature verification
+  'POST /api/v1/integrations/shopify',  // Shopify integration webhook
+  'POST /api/v1/integrations/stripe',   // Stripe integration webhook
 ]
 
 function isPublic(method: string, path: string): boolean {
@@ -34,6 +39,20 @@ export const authenticate: Middleware = async (req, res, next) => {
     const secret = process.env.JWT_SECRET
     if (!secret) throw new Error('JWT_SECRET not configured')
     const payload = verify(token, secret)
+
+    // Check if token has been blacklisted (e.g., via logout)
+    const blacklisted = await isBlacklisted(token)
+    if (blacklisted) {
+      res.status(401).json({
+        error: {
+          code: 'TOKEN_REVOKED',
+          message: 'Access token has been revoked',
+          retryable: false,
+        },
+      })
+      return
+    }
+
     req.userId = payload.sub
     req.orgId = payload.org
     req.userRole = payload.role

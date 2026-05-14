@@ -4,6 +4,7 @@ import * as net from 'net'
 import * as crypto from 'crypto'
 import { WsServer } from '../../core/ws/server'
 import { WsConnection } from '../../core/ws/connection'
+import { sign } from '../../core/auth/jwt'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,7 +34,8 @@ function buildClientFrame(text: string): Buffer {
  */
 function rawHandshake(
   port: number,
-  key: string
+  key: string,
+  token?: string
 ): Promise<{ socket: net.Socket; responseText: string }> {
   return new Promise((resolve, reject) => {
     const socket = net.connect(port, '127.0.0.1')
@@ -47,8 +49,9 @@ function rawHandshake(
     }, 5000)
 
     socket.once('connect', () => {
+      const path = token ? `/?token=${encodeURIComponent(token)}` : '/'
       socket.write(
-        'GET / HTTP/1.1\r\n' +
+        `GET ${path} HTTP/1.1\r\n` +
         'Host: localhost\r\n' +
         'Upgrade: websocket\r\n' +
         'Connection: Upgrade\r\n' +
@@ -109,6 +112,26 @@ function createTestServer(
 }
 
 // ---------------------------------------------------------------------------
+// Helpers for JWT token generation
+// ---------------------------------------------------------------------------
+
+/** Generate a test JWT token if JWT_SECRET is configured */
+function getTestToken(): string | undefined {
+  const jwtSecret = process.env.JWT_SECRET
+  if (!jwtSecret) return undefined
+
+  return sign(
+    {
+      sub: 'test-user-id',
+      org: 'test-org-id',
+      role: 'admin',
+    },
+    jwtSecret,
+    3600 // 1 hour
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -116,10 +139,11 @@ describe('WebSocket handshake', () => {
   it('WebSocket handshake returns 101 Switching Protocols', async () => {
     const { port, closeFn } = await createTestServer(() => { /* no-op */ })
     const key = crypto.randomBytes(16).toString('base64')
+    const token = getTestToken()
     let socket: net.Socket | undefined
 
     try {
-      const { socket: s, responseText } = await rawHandshake(port, key)
+      const { socket: s, responseText } = await rawHandshake(port, key, token)
       socket = s
 
       const has101 = responseText.includes('101')
@@ -141,10 +165,11 @@ describe('WebSocket handshake', () => {
     })
 
     const key = crypto.randomBytes(16).toString('base64')
+    const token = getTestToken()
     let socket: net.Socket | undefined
 
     try {
-      const { socket: s } = await rawHandshake(port, key)
+      const { socket: s } = await rawHandshake(port, key, token)
       socket = s
 
       // Send the client text frame

@@ -1,6 +1,7 @@
 import { describe, it, expect } from '../runner'
 import { login, refresh, getMe, createOrg, createUser } from '../../api/services/auth.service'
 import { query, closePool } from '../../core/db/pool'
+import { migrate } from '../../core/db/migrator'
 import { readFileSync } from 'fs'
 
 function loadEnv(): void {
@@ -18,6 +19,19 @@ function loadEnv(): void {
   } catch { /* ignore */ }
 }
 loadEnv()
+
+// Run migrations once at module load
+let _migrationRun = false
+async function _ensureMigrations(): Promise<void> {
+  if (!_migrationRun) {
+    await migrate()
+    _migrationRun = true
+  }
+}
+_ensureMigrations().catch((err) => {
+  console.error('Failed to run migrations:', err)
+  process.exit(1)
+})
 
 describe('Auth Integration', () => {
   let orgId: string
