@@ -1,6 +1,6 @@
 import { logger } from '../logger/logger'
 import { shopifyConnector } from '../../integrations/shopify/connector'
-import { stripeConnector } from '../../integrations/stripe/connector'
+import { stripeConnector } from '../../integrations/payments/stripe-connector'
 import { twilioConnector } from '../../integrations/twilio/connector'
 import { cache } from '../cache/cache'
 
