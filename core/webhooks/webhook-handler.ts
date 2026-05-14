@@ -1,6 +1,6 @@
 import { logger } from '../logger/logger'
 import { shopifyConnector } from '../../integrations/shopify/connector'
-import { stripeConnector } from '../../integrations/payments/stripe-connector'
+import { stripeConnector, type StripeWebhookEvent } from '../../integrations/payments/stripe-connector'
 import { twilioConnector } from '../../integrations/twilio/connector'
 import { cache } from '../cache/cache'
 
@@ -158,9 +158,9 @@ async function handleStripeWebhook(
 
     // Route to handler based on event type
     if (event.type === 'invoice.paid') {
-      await stripeConnector.handleInvoicePaid(payload)
+      await stripeConnector.handleInvoicePaid(payload as StripeWebhookEvent)
     } else if (event.type === 'payment_intent.payment_failed') {
-      await stripeConnector.handlePaymentFailed(payload)
+      await stripeConnector.handlePaymentFailed(payload as StripeWebhookEvent)
     } else if (event.type === 'customer.subscription.updated') {
       logger.info('Subscription updated', { customerId: event.object.customer })
     } else {

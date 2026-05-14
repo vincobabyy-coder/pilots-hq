@@ -13,7 +13,7 @@ import * as https from 'https'
  * - Event handlers for invoice.paid and payment_intent.payment_failed
  */
 
-interface StripeWebhookEvent {
+export interface StripeWebhookEvent {
   id: string
   type: string
   created: number
