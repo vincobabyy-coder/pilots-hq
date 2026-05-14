@@ -1,7 +1,7 @@
 -- Stripe billing subscriptions table
 -- Stores subscription state for each organization
 
-CREATE TABLE billing_subscriptions (
+CREATE TABLE IF NOT EXISTS billing_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
   stripe_customer_id VARCHAR(255) NOT NULL,
@@ -14,6 +14,6 @@ CREATE TABLE billing_subscriptions (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_billing_subscriptions_org ON billing_subscriptions(org_id);
-CREATE INDEX idx_billing_subscriptions_stripe_customer ON billing_subscriptions(stripe_customer_id);
-CREATE INDEX idx_billing_subscriptions_status ON billing_subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_org ON billing_subscriptions(org_id);
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_stripe_customer ON billing_subscriptions(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_status ON billing_subscriptions(status);
