@@ -8,6 +8,7 @@ COPY core/ ./core/
 COPY engines/ ./engines/
 COPY api/ ./api/
 COPY db/ ./db/
+COPY integrations/ ./integrations/
 RUN npm run build
 
 # Stage 2: production
